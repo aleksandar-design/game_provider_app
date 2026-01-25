@@ -62,18 +62,22 @@ def login_box():
 
     if is_admin():
         st.sidebar.success("Logged in as Admin")
-        if st.sidebar.button("Logout"):
-            st.session_state.clear()
+        if st.sidebar.button("Logout", key="btn_logout"):
+            # reset admin state
+            st.session_state["is_admin"] = False
+            st.session_state["admin_password"] = ""
+            st.session_state["admin_user"] = ""
         return
 
     st.sidebar.text_input("Username", key="admin_user")
     st.sidebar.text_input("Password", type="password", key="admin_password")
 
-    if st.sidebar.button("Login"):
+    if st.sidebar.button("Login", key="btn_login"):
         if st.session_state.get("admin_password") == get_admin_password():
             st.session_state["is_admin"] = True
         else:
             st.sidebar.error("Wrong password")
+
 
 # -------------------------------------------------
 # DB helpers
@@ -93,10 +97,12 @@ def qdf(sql, params=()):
 def load_countries():
     try:
         df = qdf("SELECT iso3, name FROM countries ORDER BY name")
+        if df.empty:
+            return pd.DataFrame(columns=["iso3", "name", "label"])
         df["label"] = df["name"] + " (" + df["iso3"] + ")"
         return df
     except Exception:
-        return pd.DataFrame(columns=["iso3", "label"])
+        return pd.DataFrame(columns=["iso3", "name", "label"])
 
 
 def get_provider_details(pid):
@@ -113,7 +119,7 @@ def get_provider_details(pid):
     )["country_code"].tolist()
 
     currencies = qdf(
-        "SELECT currency_code, currency_type FROM currencies WHERE provider_id=?",
+        "SELECT currency_code, currency_type FROM currencies WHERE provider_id=? ORDER BY currency_type, currency_code",
         (pid,),
     )
 
@@ -140,6 +146,7 @@ def chips(items, color):
         )
 
     st.markdown(html, unsafe_allow_html=True)
+
 
 # -------------------------------------------------
 # App start
@@ -168,25 +175,24 @@ with st.container(border=True):
     h1, h2 = st.columns([3, 1])
     h1.subheader("Filters")
 
-    if h2.button("Clear filters"):
+    if h2.button("Clear filters", key="btn_clear_filters"):
         st.session_state["f_country"] = ""
         st.session_state["f_currency"] = ""
         st.session_state["f_search"] = ""
 
     f1, f2, f3 = st.columns([2, 1, 1])
 
-    country_label = f1.selectbox(
-        "Country", [""] + country_labels, key="f_country"
-    )
+    country_label = f1.selectbox("Country", [""] + country_labels, key="f_country")
     country_iso = label_to_iso.get(country_label, "")
 
-    currency = f2.selectbox(
-        "Currency (FIAT)", [""] + fiat, key="f_currency"
-    )
+    currency = f2.selectbox("Currency (FIAT)", [""] + fiat, key="f_currency")
 
-    search = f3.text_input(
-        "Search provider", key="f_search"
-    )
+    search = f3.text_input("Search provider", key="f_search")
+
+st.caption(
+    "Rules: providers with currency_mode=ALL_FIAT match any FIAT currency (even if not listed). "
+    "Crypto is hidden by default."
+)
 
 # -------------------------------------------------
 # Query
@@ -199,9 +205,7 @@ if search:
     params.append(f"%{search.lower()}%")
 
 if country_iso:
-    where.append(
-        "p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code=?)"
-    )
+    where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code=?)")
     params.append(country_iso)
 
 if currency:
@@ -242,9 +246,19 @@ c3.metric("Country", country_label or "Any")
 c4.metric("Currency", currency or "Any")
 
 # -------------------------------------------------
-# Results
+# Results + Export
 # -------------------------------------------------
-st.subheader("Results")
+r1, r2 = st.columns([3, 1])
+r1.subheader("Results")
+
+# Export button (CSV opens in Excel)
+r2.download_button(
+    "Export CSV",
+    data=df.to_csv(index=False).encode("utf-8"),
+    file_name="game_providers_results.csv",
+    mime="text/csv",
+    key="btn_export_csv",
+)
 
 st.dataframe(
     df,
@@ -261,9 +275,11 @@ st.dataframe(
 # -------------------------------------------------
 st.markdown("### Provider details")
 
-if not df.empty:
-    options = [f"{r.ID} — {r['Game Provider']}" for _, r in df.iterrows()]
-    pick = st.selectbox("Select provider", [""] + options)
+if df.empty:
+    st.info("No providers match your filters.")
+else:
+    options = [f"{row['ID']} — {row['Game Provider']}" for _, row in df.iterrows()]
+    pick = st.selectbox("Select provider", [""] + options, key="pick_provider_details")
 
     if pick:
         pid = int(pick.split("—")[0].strip())
@@ -271,8 +287,8 @@ if not df.empty:
 
         if details:
             p = details["provider"]
-            r = details["restrictions"]
-            c = details["currencies"]
+            restrictions = details["restrictions"]
+            currencies_df = details["currencies"]
 
             with st.container(border=True):
                 a, b, d = st.columns([2, 1, 1])
@@ -281,25 +297,33 @@ if not df.empty:
                 d.markdown(f"**Currency Mode:** {p.currency_mode}")
 
                 st.markdown("#### Restricted countries")
-                chips(r, "#4B1E2F")
+                chips(restrictions, "#4B1E2F")
 
                 st.markdown("#### Currencies")
-                if c.empty:
-                    st.write("None")
+                if currencies_df.empty:
+                    st.write("None ✅")
                 else:
-                    chips(c["currency_code"].tolist(), "#1F6F43")
+                    fiat_list = currencies_df[currencies_df["currency_type"] == "FIAT"]["currency_code"].tolist()
+                    crypto_list = currencies_df[currencies_df["currency_type"] == "CRYPTO"]["currency_code"].tolist()
+
+                    if fiat_list:
+                        st.markdown("**FIAT**")
+                        chips(fiat_list, "#1F6F43")
+                    if crypto_list:
+                        st.markdown("**CRYPTO**")
+                        chips(crypto_list, "#3A3A3A")
 
 # -------------------------------------------------
-# Admin
+# Admin (minimal, safe)
 # -------------------------------------------------
 if is_admin():
-    with st.expander("Admin: Edit provider data"):
+    with st.expander("Admin: Quick view provider record", expanded=False):
         providers = qdf("SELECT provider_id, provider_name FROM providers ORDER BY provider_name")
-        opts = [f"{x.provider_id} — {x.provider_name}" for _, x in providers.iterrows()]
-        sel = st.selectbox("Select provider", [""] + opts)
+        opts = [f"{x['provider_id']} — {x['provider_name']}" for _, x in providers.iterrows()]
+        sel = st.selectbox("Select provider", [""] + opts, key="admin_sel_provider_quick")
 
         if sel:
             pid = int(sel.split("—")[0].strip())
-            st.write(qdf("SELECT * FROM providers WHERE provider_id=?", (pid,)))
+            st.dataframe(qdf("SELECT * FROM providers WHERE provider_id=?", (pid,)), hide_index=True, use_container_width=True)
 
 st.caption("Re-import from files by running: py importer.py")
