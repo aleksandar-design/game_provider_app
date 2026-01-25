@@ -1,15 +1,18 @@
 import os
+import io
+import json
 import sqlite3
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from openai import OpenAI
 
 DB_PATH = Path("db") / "database.sqlite"
 
-# -------------------------------------------------
+# =================================================
 # Page config + styling
-# -------------------------------------------------
+# =================================================
 st.set_page_config(page_title="Game Providers", layout="wide")
 
 st.markdown(
@@ -44,9 +47,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# -------------------------------------------------
+# =================================================
 # Auth
-# -------------------------------------------------
+# =================================================
 def get_admin_password():
     if "ADMIN_PASSWORD" in st.secrets:
         return str(st.secrets["ADMIN_PASSWORD"])
@@ -63,10 +66,7 @@ def login_box():
     if is_admin():
         st.sidebar.success("Logged in as Admin")
         if st.sidebar.button("Logout", key="btn_logout"):
-            # reset admin state
-            st.session_state["is_admin"] = False
-            st.session_state["admin_password"] = ""
-            st.session_state["admin_user"] = ""
+            st.session_state.clear()
         return
 
     st.sidebar.text_input("Username", key="admin_user")
@@ -78,10 +78,9 @@ def login_box():
         else:
             st.sidebar.error("Wrong password")
 
-
-# -------------------------------------------------
+# =================================================
 # DB helpers
-# -------------------------------------------------
+# =================================================
 def db():
     con = sqlite3.connect(DB_PATH)
     con.execute("PRAGMA foreign_keys = ON;")
@@ -97,60 +96,113 @@ def qdf(sql, params=()):
 def load_countries():
     try:
         df = qdf("SELECT iso3, name FROM countries ORDER BY name")
-        if df.empty:
-            return pd.DataFrame(columns=["iso3", "name", "label"])
         df["label"] = df["name"] + " (" + df["iso3"] + ")"
         return df
     except Exception:
         return pd.DataFrame(columns=["iso3", "name", "label"])
 
 
-def get_provider_details(pid):
-    prov = qdf(
-        "SELECT provider_id, provider_name, currency_mode FROM providers WHERE provider_id=?",
-        (pid,),
-    )
-    if prov.empty:
+def upsert_provider(provider_name: str, currency_mode: str) -> int:
+    with db() as con:
+        cur = con.execute(
+            "SELECT provider_id FROM providers WHERE provider_name=?",
+            (provider_name,),
+        )
+        row = cur.fetchone()
+        if row:
+            pid = int(row[0])
+            con.execute(
+                "UPDATE providers SET currency_mode=? WHERE provider_id=?",
+                (currency_mode, pid),
+            )
+            con.commit()
+            return pid
+        else:
+            cur = con.execute(
+                "INSERT INTO providers(provider_name, currency_mode, status) VALUES(?, ?, 'ACTIVE')",
+                (provider_name, currency_mode),
+            )
+            con.commit()
+            return int(cur.lastrowid)
+
+
+def replace_ai_restrictions(provider_id: int, iso3_list: list[str]):
+    with db() as con:
+        con.execute(
+            "DELETE FROM restrictions WHERE provider_id=? AND source='ai_import'",
+            (provider_id,),
+        )
+        con.executemany(
+            "INSERT OR IGNORE INTO restrictions(provider_id, country_code, source) VALUES (?, ?, 'ai_import')",
+            [(provider_id, c) for c in iso3_list],
+        )
+        con.commit()
+
+# =================================================
+# AI helpers
+# =================================================
+def get_openai_client():
+    if "OPENAI_API_KEY" not in st.secrets:
         return None
+    return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-    restrictions = qdf(
-        "SELECT country_code FROM restrictions WHERE provider_id=? ORDER BY country_code",
-        (pid,),
-    )["country_code"].tolist()
 
-    currencies = qdf(
-        "SELECT currency_code, currency_type FROM currencies WHERE provider_id=? ORDER BY currency_type, currency_code",
-        (pid,),
-    )
+def read_excel_preview(file_bytes: bytes):
+    xls = pd.ExcelFile(io.BytesIO(file_bytes))
+    sheets = xls.sheet_names
 
-    return {
-        "provider": prov.iloc[0],
-        "restrictions": restrictions,
-        "currencies": currencies,
+    preview = []
+    for s in sheets[:2]:
+        df = pd.read_excel(xls, sheet_name=s)
+        preview.append(
+            {
+                "sheet": s,
+                "sample": df.head(20).astype(str).values.tolist(),
+            }
+        )
+    return preview
+
+
+def ai_extract_plan(file_name: str, preview, iso3_list):
+    client = get_openai_client()
+    if not client:
+        return {"error": "OPENAI_API_KEY missing in secrets"}
+
+    prompt = {
+        "file_name": file_name,
+        "preview": preview,
+        "allowed_iso3": iso3_list,
+        "instructions": """
+You are extracting data from a game provider Excel file.
+
+Return ONLY valid JSON with:
+{
+  provider_name: string,
+  currency_mode: "ALL_FIAT" or "LIST",
+  restricted_iso3: [ISO3 country codes],
+  notes: string
+}
+
+Use only ISO3 codes from allowed_iso3.
+""",
     }
 
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a precise data extraction assistant."},
+            {"role": "user", "content": json.dumps(prompt)},
+        ],
+    )
 
-def chips(items, color):
-    if not items:
-        st.write("None ✅")
-        return
+    try:
+        return json.loads(response.choices[0].message.content)
+    except Exception:
+        return {"error": "AI returned invalid JSON"}
 
-    html = ""
-    for i in items:
-        html += (
-            f"<span style='display:inline-block;"
-            f"margin:4px;padding:6px 10px;"
-            f"border-radius:12px;"
-            f"background:{color};"
-            f"font-size:0.85rem'>{i}</span>"
-        )
-
-    st.markdown(html, unsafe_allow_html=True)
-
-
-# -------------------------------------------------
+# =================================================
 # App start
-# -------------------------------------------------
+# =================================================
 login_box()
 
 st.markdown("## Game Providers")
@@ -160,170 +212,63 @@ if not DB_PATH.exists():
     st.error("Database not found")
     st.stop()
 
-countries_df = load_countries()
-country_labels = countries_df["label"].tolist()
-label_to_iso = dict(zip(countries_df["label"], countries_df["iso3"]))
+countries = load_countries()
+iso3_list = countries["iso3"].tolist()
 
-fiat = qdf(
-    "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
-)["currency_code"].tolist()
+# =================================================
+# Results (simple)
+# =================================================
+df = qdf("SELECT provider_id AS ID, provider_name AS Provider FROM providers ORDER BY provider_name")
+st.dataframe(df, hide_index=True, use_container_width=True)
 
-# -------------------------------------------------
-# Filters
-# -------------------------------------------------
-with st.container(border=True):
-    h1, h2 = st.columns([3, 1])
-    h1.subheader("Filters")
-
-    if h2.button("Clear filters", key="btn_clear_filters"):
-        st.session_state["f_country"] = ""
-        st.session_state["f_currency"] = ""
-        st.session_state["f_search"] = ""
-
-    f1, f2, f3 = st.columns([2, 1, 1])
-
-    country_label = f1.selectbox("Country", [""] + country_labels, key="f_country")
-    country_iso = label_to_iso.get(country_label, "")
-
-    currency = f2.selectbox("Currency (FIAT)", [""] + fiat, key="f_currency")
-
-    search = f3.text_input("Search provider", key="f_search")
-
-st.caption(
-    "Rules: providers with currency_mode=ALL_FIAT match any FIAT currency (even if not listed). "
-    "Crypto is hidden by default."
-)
-
-# -------------------------------------------------
-# Query
-# -------------------------------------------------
-where = []
-params = []
-
-if search:
-    where.append("LOWER(p.provider_name) LIKE ?")
-    params.append(f"%{search.lower()}%")
-
-if country_iso:
-    where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code=?)")
-    params.append(country_iso)
-
-if currency:
-    where.append(
-        """
-        (
-            p.currency_mode='ALL_FIAT'
-            OR EXISTS (
-                SELECT 1 FROM currencies c
-                WHERE c.provider_id=p.provider_id
-                AND c.currency_type='FIAT'
-                AND c.currency_code=?
-            )
-        )
-        """
-    )
-    params.append(currency)
-
-where_sql = "WHERE " + " AND ".join(where) if where else ""
-
-df = qdf(
-    f"""
-    SELECT provider_id AS ID, provider_name AS "Game Provider"
-    FROM providers p
-    {where_sql}
-    ORDER BY provider_name
-    """,
-    tuple(params),
-)
-
-# -------------------------------------------------
-# Summary
-# -------------------------------------------------
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Providers", int(qdf("SELECT COUNT(*) c FROM providers")["c"][0]))
-c2.metric("Matching", len(df))
-c3.metric("Country", country_label or "Any")
-c4.metric("Currency", currency or "Any")
-
-# -------------------------------------------------
-# Results + Export
-# -------------------------------------------------
-r1, r2 = st.columns([3, 1])
-r1.subheader("Results")
-
-# Export button (CSV opens in Excel)
-r2.download_button(
+st.download_button(
     "Export CSV",
-    data=df.to_csv(index=False).encode("utf-8"),
-    file_name="game_providers_results.csv",
+    data=df.to_csv(index=False),
+    file_name="providers.csv",
     mime="text/csv",
-    key="btn_export_csv",
 )
 
-st.dataframe(
-    df,
-    hide_index=True,
-    use_container_width=True,
-    column_config={
-        "ID": st.column_config.NumberColumn("ID", width="small"),
-        "Game Provider": st.column_config.TextColumn("Game Provider"),
-    },
-)
-
-# -------------------------------------------------
-# Provider details
-# -------------------------------------------------
-st.markdown("### Provider details")
-
-if df.empty:
-    st.info("No providers match your filters.")
-else:
-    options = [f"{row['ID']} — {row['Game Provider']}" for _, row in df.iterrows()]
-    pick = st.selectbox("Select provider", [""] + options, key="pick_provider_details")
-
-    if pick:
-        pid = int(pick.split("—")[0].strip())
-        details = get_provider_details(pid)
-
-        if details:
-            p = details["provider"]
-            restrictions = details["restrictions"]
-            currencies_df = details["currencies"]
-
-            with st.container(border=True):
-                a, b, d = st.columns([2, 1, 1])
-                a.markdown(f"**Game Provider:** {p.provider_name}")
-                b.markdown(f"**ID:** {p.provider_id}")
-                d.markdown(f"**Currency Mode:** {p.currency_mode}")
-
-                st.markdown("#### Restricted countries")
-                chips(restrictions, "#4B1E2F")
-
-                st.markdown("#### Currencies")
-                if currencies_df.empty:
-                    st.write("None ✅")
-                else:
-                    fiat_list = currencies_df[currencies_df["currency_type"] == "FIAT"]["currency_code"].tolist()
-                    crypto_list = currencies_df[currencies_df["currency_type"] == "CRYPTO"]["currency_code"].tolist()
-
-                    if fiat_list:
-                        st.markdown("**FIAT**")
-                        chips(fiat_list, "#1F6F43")
-                    if crypto_list:
-                        st.markdown("**CRYPTO**")
-                        chips(crypto_list, "#3A3A3A")
-
-# -------------------------------------------------
-# Admin (minimal, safe)
-# -------------------------------------------------
+# =================================================
+# Admin AI Agent
+# =================================================
 if is_admin():
-    with st.expander("Admin: Quick view provider record", expanded=False):
-        providers = qdf("SELECT provider_id, provider_name FROM providers ORDER BY provider_name")
-        opts = [f"{x['provider_id']} — {x['provider_name']}" for _, x in providers.iterrows()]
-        sel = st.selectbox("Select provider", [""] + opts, key="admin_sel_provider_quick")
+    with st.expander("Admin: AI Agent — Import provider from Excel", expanded=True):
+        st.caption("Upload an Excel file. AI will extract provider name and restricted countries.")
 
-        if sel:
-            pid = int(sel.split("—")[0].strip())
-            st.dataframe(qdf("SELECT * FROM providers WHERE provider_id=?", (pid,)), hide_index=True, use_container_width=True)
+        if "OPENAI_API_KEY" not in st.secrets:
+            st.error("OPENAI_API_KEY is missing in Streamlit Secrets.")
+        else:
+            uploaded = st.file_uploader("Upload Excel (.xlsx)", type=["xlsx"])
 
-st.caption("Re-import from files by running: py importer.py")
+            if uploaded:
+                preview = read_excel_preview(uploaded.getvalue())
+                st.write("Excel preview:")
+                st.json(preview)
+
+                if st.button("Run AI extraction"):
+                    plan = ai_extract_plan(uploaded.name, preview, iso3_list)
+                    st.session_state["ai_plan"] = plan
+
+                plan = st.session_state.get("ai_plan")
+                if plan:
+                    if "error" in plan:
+                        st.error(plan["error"])
+                    else:
+                        st.success("AI extraction successful")
+                        st.json(plan)
+
+                        provider_name = st.text_input(
+                            "Provider name",
+                            value=plan["provider_name"],
+                        )
+                        currency_mode = st.selectbox(
+                            "Currency mode",
+                            ["ALL_FIAT", "LIST"],
+                            index=0 if plan["currency_mode"] == "ALL_FIAT" else 1,
+                        )
+
+                        if st.button("Apply AI Import", type="primary"):
+                            pid = upsert_provider(provider_name, currency_mode)
+                            replace_ai_restrictions(pid, plan["restricted_iso3"])
+                            st.success(f"Imported provider {provider_name} (ID {pid})")
+                            st.cache_data.clear()
