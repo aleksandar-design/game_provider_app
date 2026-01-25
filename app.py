@@ -10,6 +10,43 @@ st.set_page_config(page_title="Game Providers", layout="wide")
 
 
 # -------------------------
+# Auth (Admin login)
+# -------------------------
+def is_admin() -> bool:
+    """
+    Simple admin gate using Streamlit Secrets:
+      - In Streamlit Cloud -> App -> Settings -> Secrets
+      - Add: ADMIN_PASSWORD = "yourpassword"
+    """
+    admin_pw = st.secrets.get("ADMIN_PASSWORD", "")
+    if not admin_pw:
+        # No secret configured => admin disabled
+        return False
+
+    # Keep login state in the session
+    if "is_admin" not in st.session_state:
+        st.session_state["is_admin"] = False
+
+    with st.sidebar:
+        st.markdown("### Admin login")
+        entered = st.text_input("Password", type="password", key="admin_pw")
+        colA, colB = st.columns([1, 1])
+        with colA:
+            if st.button("Log in", use_container_width=True):
+                st.session_state["is_admin"] = (entered == admin_pw)
+        with colB:
+            if st.button("Log out", use_container_width=True):
+                st.session_state["is_admin"] = False
+
+        if st.session_state["is_admin"]:
+            st.success("Admin mode enabled")
+        else:
+            st.caption("Admin panel is hidden unless you log in.")
+
+    return bool(st.session_state["is_admin"])
+
+
+# -------------------------
 # DB helpers
 # -------------------------
 def db() -> sqlite3.Connection:
@@ -49,7 +86,8 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
     Returns columns: iso3, label
     """
     codes = qdf(
-        "SELECT DISTINCT country_code AS iso3 FROM restrictions WHERE country_code IS NOT NULL AND country_code <> '' ORDER BY country_code"
+        "SELECT DISTINCT country_code AS iso3 FROM restrictions "
+        "WHERE country_code IS NOT NULL AND country_code <> '' ORDER BY country_code"
     )
     countries_ref = load_countries_table()
 
@@ -59,7 +97,7 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
         return codes[["iso3", "label"]]
 
     merged = codes.merge(countries_ref[["iso3", "label"]], on="iso3", how="left")
-    merged["label"] = merged["label"].fillna(merged["iso3"])  # fallback if missing mapping
+    merged["label"] = merged["label"].fillna(merged["iso3"])
     return merged[["iso3", "label"]]
 
 
@@ -72,15 +110,21 @@ if not DB_PATH.exists():
     st.error("Database not found. Run: py db_init.py  then  py importer.py")
     st.stop()
 
+# Evaluate admin (also renders sidebar login)
+ADMIN = is_admin()
+
 countries_ref = load_countries_table()
 
 # -------------------------
 # Filters
 # -------------------------
 country_choices_df = load_country_labels_from_restrictions()
+
 fiat = qdf(
-    "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
+    "SELECT DISTINCT currency_code FROM currencies "
+    "WHERE currency_type='FIAT' ORDER BY currency_code"
 )["currency_code"].tolist()
+
 statuses = qdf("SELECT DISTINCT status FROM providers ORDER BY status")["status"].tolist()
 
 col1, col2, col3 = st.columns(3)
@@ -154,127 +198,141 @@ ORDER BY p.provider_name
 st.subheader("Results")
 st.dataframe(df, use_container_width=True, hide_index=True)
 
-
 # -------------------------
-# Admin panel
+# Admin panel (only visible for admins)
 # -------------------------
-with st.expander("Admin: Edit provider data"):
-    pid = st.number_input("provider_id", min_value=1, step=1)
-    if pid:
-        prov = qdf("SELECT * FROM providers WHERE provider_id=?", (pid,))
-        if prov.empty:
-            st.warning("Provider not found.")
-        else:
-            st.write("Provider:", prov.iloc[0].to_dict())
+if ADMIN:
+    with st.expander("Admin: Edit provider data", expanded=False):
+        pid = st.number_input("provider_id", min_value=1, step=1)
 
-            # ---- Add restriction
-            st.markdown("### Add restriction")
-
-            # Prefer dropdown by country name if countries table exists
-            if not countries_ref.empty:
-                admin_country_label = st.selectbox(
-                    "Country to restrict",
-                    [""] + countries_ref["label"].tolist(),
-                    key="admin_add_country_label",
-                )
-                new_cc = ""
-                if admin_country_label:
-                    new_cc = admin_country_label.split("(")[-1].replace(")", "").strip()
+        if pid:
+            prov = qdf("SELECT * FROM providers WHERE provider_id=?", (pid,))
+            if prov.empty:
+                st.warning("Provider not found.")
             else:
-                new_cc = st.text_input("Country code (ISO3, e.g. GBR, USA)", value="").strip().upper()
+                st.write("Provider:", prov.iloc[0].to_dict())
 
-            if st.button("Add restricted country"):
-                if new_cc:
-                    with db() as con:
-                        con.execute(
-                            "INSERT OR IGNORE INTO restrictions(provider_id, country_code, source) VALUES (?, ?, ?)",
-                            (pid, new_cc, "manual"),
-                        )
-                        con.commit()
-                    st.success(f"Added restriction: {new_cc}")
-                    st.cache_data.clear()  # refresh dropdowns after edits
-                else:
-                    st.warning("Choose a country (or enter ISO3) first.")
+                # ---- Add restriction
+                st.markdown("### Add restriction")
 
-            # ---- Remove restriction
-            st.markdown("### Remove restriction")
-
-            existing_df = qdf(
-                "SELECT country_code FROM restrictions WHERE provider_id=? ORDER BY country_code",
-                (pid,),
-            )
-            existing_codes = existing_df["country_code"].tolist()
-
-            if existing_codes:
+                # Prefer dropdown by country name if countries table exists
                 if not countries_ref.empty:
-                    # Build readable labels for existing restrictions
-                    tmp = pd.DataFrame({"iso3": existing_codes})
-                    tmp = tmp.merge(countries_ref[["iso3", "label"]], on="iso3", how="left")
-                    tmp["label"] = tmp["label"].fillna(tmp["iso3"])
-                    rem_label = st.selectbox("Choose to remove", [""] + tmp["label"].tolist(), key="admin_remove_country")
-                    rem_code = ""
-                    if rem_label:
-                        rem_code = rem_label.split("(")[-1].replace(")", "").strip() if "(" in rem_label else rem_label
+                    admin_country_label = st.selectbox(
+                        "Country to restrict",
+                        [""] + countries_ref["label"].tolist(),
+                        key="admin_add_country_label",
+                    )
+                    new_cc = ""
+                    if admin_country_label:
+                        new_cc = admin_country_label.split("(")[-1].replace(")", "").strip()
                 else:
-                    rem_code = st.selectbox("Choose to remove (ISO3)", [""] + existing_codes, key="admin_remove_country")
-                if st.button("Remove selected restriction"):
-                    if rem_code:
+                    new_cc = st.text_input("Country code (ISO3, e.g. GBR, USA)", value="").strip().upper()
+
+                if st.button("Add restricted country"):
+                    if new_cc:
                         with db() as con:
                             con.execute(
-                                "DELETE FROM restrictions WHERE provider_id=? AND country_code=?",
-                                (pid, rem_code),
+                                "INSERT OR IGNORE INTO restrictions(provider_id, country_code, source) VALUES (?, ?, ?)",
+                                (pid, new_cc, "manual"),
                             )
                             con.commit()
-                        st.success(f"Removed restriction: {rem_code}")
+                        st.success(f"Added restriction: {new_cc}")
                         st.cache_data.clear()
                     else:
-                        st.warning("Pick a restriction to remove.")
-            else:
-                st.info("No restrictions found for this provider.")
+                        st.warning("Choose a country (or enter ISO3) first.")
 
-            # ---- Add currency
-            st.markdown("### Add currency")
-            ccode = st.text_input("Currency code (e.g. BRL, USD)", key="ccode").strip().upper()
-            ctype = st.selectbox("Type", ["FIAT", "CRYPTO"])
-            display = st.checkbox("Display (show in app)", value=(ctype == "FIAT"))
-            if st.button("Add currency"):
-                if ccode:
-                    with db() as con:
-                        con.execute(
-                            """
-                          INSERT OR IGNORE INTO currencies(provider_id, currency_code, currency_type, display, source)
-                          VALUES (?, ?, ?, ?, ?)
-                        """,
-                            (pid, ccode, ctype, 1 if display else 0, "manual"),
-                        )
-                        con.commit()
-                    st.success(f"Added currency: {ccode} ({ctype})")
-                    st.cache_data.clear()
-                else:
-                    st.warning("Enter a currency code first.")
+                # ---- Remove restriction
+                st.markdown("### Remove restriction")
 
-            # ---- Remove currency
-            st.markdown("### Remove currency")
-            cur = qdf(
-                "SELECT currency_code || ' (' || currency_type || ')' AS label FROM currencies WHERE provider_id=? ORDER BY currency_type, currency_code",
-                (pid,),
-            )
-            labels = cur["label"].tolist()
-            pick = st.selectbox("Choose to remove currency", [""] + labels)
-            if st.button("Remove selected currency"):
-                if pick:
-                    code = pick.split(" ")[0]
-                    ctype2 = pick.split("(")[-1].replace(")", "").strip()
-                    with db() as con:
-                        con.execute(
-                            "DELETE FROM currencies WHERE provider_id=? AND currency_code=? AND currency_type=?",
-                            (pid, code, ctype2),
+                existing_df = qdf(
+                    "SELECT country_code FROM restrictions WHERE provider_id=? ORDER BY country_code",
+                    (pid,),
+                )
+                existing_codes = existing_df["country_code"].tolist()
+
+                if existing_codes:
+                    if not countries_ref.empty:
+                        tmp = pd.DataFrame({"iso3": existing_codes})
+                        tmp = tmp.merge(countries_ref[["iso3", "label"]], on="iso3", how="left")
+                        tmp["label"] = tmp["label"].fillna(tmp["iso3"])
+                        rem_label = st.selectbox(
+                            "Choose to remove",
+                            [""] + tmp["label"].tolist(),
+                            key="admin_remove_country",
                         )
-                        con.commit()
-                    st.success(f"Removed currency: {code} ({ctype2})")
-                    st.cache_data.clear()
+                        rem_code = ""
+                        if rem_label:
+                            rem_code = rem_label.split("(")[-1].replace(")", "").strip() if "(" in rem_label else rem_label
+                    else:
+                        rem_code = st.selectbox(
+                            "Choose to remove (ISO3)",
+                            [""] + existing_codes,
+                            key="admin_remove_country",
+                        )
+
+                    if st.button("Remove selected restriction"):
+                        if rem_code:
+                            with db() as con:
+                                con.execute(
+                                    "DELETE FROM restrictions WHERE provider_id=? AND country_code=?",
+                                    (pid, rem_code),
+                                )
+                                con.commit()
+                            st.success(f"Removed restriction: {rem_code}")
+                            st.cache_data.clear()
+                        else:
+                            st.warning("Pick a restriction to remove.")
                 else:
-                    st.warning("Pick a currency to remove.")
+                    st.info("No restrictions found for this provider.")
+
+                # ---- Add currency
+                st.markdown("### Add currency")
+                ccode = st.text_input("Currency code (e.g. BRL, USD)", key="ccode").strip().upper()
+                ctype = st.selectbox("Type", ["FIAT", "CRYPTO"])
+                display = st.checkbox("Display (show in app)", value=(ctype == "FIAT"))
+
+                if st.button("Add currency"):
+                    if ccode:
+                        with db() as con:
+                            con.execute(
+                                """
+                                INSERT OR IGNORE INTO currencies(provider_id, currency_code, currency_type, display, source)
+                                VALUES (?, ?, ?, ?, ?)
+                                """,
+                                (pid, ccode, ctype, 1 if display else 0, "manual"),
+                            )
+                            con.commit()
+                        st.success(f"Added currency: {ccode} ({ctype})")
+                        st.cache_data.clear()
+                    else:
+                        st.warning("Enter a currency code first.")
+
+                # ---- Remove currency
+                st.markdown("### Remove currency")
+                cur = qdf(
+                    "SELECT currency_code || ' (' || currency_type || ')' AS label "
+                    "FROM currencies WHERE provider_id=? ORDER BY currency_type, currency_code",
+                    (pid,),
+                )
+                labels = cur["label"].tolist()
+                pick = st.selectbox("Choose to remove currency", [""] + labels)
+
+                if st.button("Remove selected currency"):
+                    if pick:
+                        code = pick.split(" ")[0]
+                        ctype2 = pick.split("(")[-1].replace(")", "").strip()
+                        with db() as con:
+                            con.execute(
+                                "DELETE FROM currencies WHERE provider_id=? AND currency_code=? AND currency_type=?",
+                                (pid, code, ctype2),
+                            )
+                            con.commit()
+                        st.success(f"Removed currency: {code} ({ctype2})")
+                        st.cache_data.clear()
+                    else:
+                        st.warning("Pick a currency to remove.")
+else:
+    st.info("Admin panel is hidden. Use the sidebar login to enable admin mode (requires ADMIN_PASSWORD secret).")
 
 st.info(
     "To re-import from files, run: py importer.py  (it replaces imported restrictions/currencies from those files). "
