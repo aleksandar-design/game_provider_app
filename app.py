@@ -136,7 +136,6 @@ def chips(items, color):
     if not items:
         st.write("None ✅")
         return
-
     html = ""
     for i in items:
         html += (
@@ -147,107 +146,6 @@ def chips(items, color):
             f"font-size:0.85rem'>{i}</span>"
         )
     st.markdown(html, unsafe_allow_html=True)
-
-# =================================================
-# AI helpers
-# =================================================
-def get_openai_client():
-    if "OPENAI_API_KEY" in st.secrets:
-        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if api_key:
-        return OpenAI(api_key=api_key)
-    return None
-
-
-ISO3_RE = re.compile(r"\b[A-Z]{3}\b")
-
-
-def read_excel_preview(file_bytes: bytes):
-    """
-    Read minimal info from Excel:
-    - sheet names
-    - first ~80 lines from 'Restricted countries' if present
-    - first ~40 lines from 'Supported currencies' if present
-    """
-    xls = pd.ExcelFile(io.BytesIO(file_bytes))
-    sheet_names = xls.sheet_names
-
-    restricted_lines = []
-    if "Restricted countries" in sheet_names:
-        df = pd.read_excel(xls, sheet_name="Restricted countries", header=None)
-        col0 = df.iloc[:, 0].dropna().astype(str).tolist()
-        restricted_lines = col0[:80]
-
-    currency_lines = []
-    if "Supported currencies" in sheet_names:
-        df = pd.read_excel(xls, sheet_name="Supported currencies", header=None)
-        flat = df.dropna().astype(str).values.flatten().tolist()
-        currency_lines = flat[:40]
-
-    return {
-        "sheet_names": sheet_names,
-        "restricted_lines": restricted_lines,
-        "currency_lines": currency_lines,
-    }
-
-
-def ai_extract_plan(file_name: str, preview: dict, allowed_iso3: list[str]):
-    """
-    Ask AI to return a JSON plan. Keep it simple & safe.
-    """
-    client = get_openai_client()
-    if not client:
-        return {"error": "OPENAI_API_KEY missing. Add it in Streamlit Secrets."}
-
-    payload = {
-        "file_name": file_name,
-        "sheet_names": preview.get("sheet_names", []),
-        "restricted_lines": preview.get("restricted_lines", []),
-        "currency_lines": preview.get("currency_lines", []),
-        "allowed_iso3_sample": allowed_iso3[:80],
-        "instructions": """
-Return ONLY JSON with:
-{
-  "provider_name": "string",
-  "currency_mode": "ALL_FIAT" or "LIST",
-  "restricted_iso3": ["ISO3", ...],
-  "notes": "string"
-}
-
-Use only ISO3 codes from the allowed list sample. If unsure, skip.
-""",
-    }
-
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You extract data carefully. Return only valid JSON, no extra text."},
-            {"role": "user", "content": json.dumps(payload)},
-        ],
-        temperature=0.2,
-    )
-
-    text = resp.choices[0].message.content.strip()
-
-    # Try parse JSON
-    try:
-        plan = json.loads(text)
-    except Exception:
-        return {"error": "AI response was not valid JSON. Try again."}
-
-    # Safety filter: keep only ISO3 codes that exist in our DB list
-    allowed = set(allowed_iso3)
-    raw_list = plan.get("restricted_iso3", [])
-    plan["restricted_iso3"] = sorted({c for c in raw_list if c in allowed})
-
-    # Defaults
-    if plan.get("currency_mode") not in ("ALL_FIAT", "LIST"):
-        plan["currency_mode"] = "LIST"
-    if not plan.get("provider_name"):
-        plan["provider_name"] = Path(file_name).stem
-
-    return plan
 
 
 def upsert_provider_by_name(provider_name: str, currency_mode: str) -> int:
@@ -276,6 +174,171 @@ def replace_ai_restrictions(provider_id: int, iso3_list: list[str]):
             [(provider_id, code) for code in iso3_list],
         )
         con.commit()
+
+
+def replace_ai_fiat_currencies(provider_id: int, fiat_codes: list[str]):
+    """
+    Store supported FIAT currency codes so your Currency filter works after import.
+    """
+    with db() as con:
+        con.execute(
+            "DELETE FROM currencies WHERE provider_id=? AND source='ai_import' AND currency_type='FIAT'",
+            (provider_id,),
+        )
+        con.executemany(
+            """
+            INSERT OR IGNORE INTO currencies(provider_id, currency_code, currency_type, display, source)
+            VALUES (?, ?, 'FIAT', 1, 'ai_import')
+            """,
+            [(provider_id, c) for c in fiat_codes],
+        )
+        con.commit()
+
+# =================================================
+# AI + Excel extraction helpers
+# =================================================
+ISO3_RE = re.compile(r"\b[A-Z]{3}\b")
+CURRENCY_RE = re.compile(r"^\s*([A-Z0-9]{3,10})\s*(\(|$)")  # e.g. USD (..), ARSBLUE (..), EUR
+
+def get_openai_client():
+    if "OPENAI_API_KEY" in st.secrets:
+        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if api_key:
+        return OpenAI(api_key=api_key)
+    return None
+
+
+def find_sheet_name(sheet_names: list[str], keyword: str) -> str:
+    """
+    Find first sheet containing keyword (case-insensitive).
+    Example: keyword='restrict' matches 'Restricted areas'
+    """
+    kw = keyword.lower()
+    for s in sheet_names:
+        if kw in s.lower():
+            return s
+    return ""
+
+
+def safe_read_sheet(xls: pd.ExcelFile, sheet_name: str, max_rows: int = 200) -> pd.DataFrame:
+    if not sheet_name:
+        return pd.DataFrame()
+    try:
+        df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+        return df.head(max_rows)
+    except Exception:
+        return pd.DataFrame()
+
+
+def extract_iso3_from_df(df: pd.DataFrame, allowed_iso3: set[str]) -> list[str]:
+    if df is None or df.empty:
+        return []
+    found = set()
+    for v in df.astype(str).values.flatten().tolist():
+        for m in ISO3_RE.findall(str(v).upper()):
+            if m in allowed_iso3:
+                found.add(m)
+    return sorted(found)
+
+
+def extract_currency_codes_from_df(df: pd.DataFrame) -> list[str]:
+    """
+    Extract currency codes from cells like:
+    'USD (United States Dollar)', 'ARSBLUE (...)'
+    Ignore header lines like 'Supported currencies'
+    """
+    if df is None or df.empty:
+        return []
+    found = []
+    for v in df.astype(str).values.flatten().tolist():
+        s = str(v).strip()
+        if not s or s.lower().startswith("supported curr"):
+            continue
+        m = CURRENCY_RE.match(s.upper())
+        if m:
+            code = m.group(1).strip()
+            # ignore obvious non-codes
+            if code.isalpha() or any(ch.isdigit() for ch in code):
+                found.append(code)
+    # unique, keep order
+    seen = set()
+    ordered = []
+    for c in found:
+        if c not in seen:
+            seen.add(c)
+            ordered.append(c)
+    return ordered
+
+
+def read_excel_extract(file_bytes: bytes, allowed_iso3: list[str]) -> dict:
+    """
+    Read Excel and extract:
+    - detected sheet names
+    - restricted ISO3 codes (deterministic)
+    - fiat currency codes (deterministic)
+    """
+    xls = pd.ExcelFile(io.BytesIO(file_bytes))
+    sheets = xls.sheet_names
+
+    restrict_sheet = find_sheet_name(sheets, "restrict")   # works for "Restricted areas"
+    currency_sheet = find_sheet_name(sheets, "currenc")    # works for "Supported currencies"
+
+    df_restrict = safe_read_sheet(xls, restrict_sheet, max_rows=300)
+    df_currency = safe_read_sheet(xls, currency_sheet, max_rows=400)
+
+    allowed_set = set([c for c in allowed_iso3 if isinstance(c, str)])
+
+    restricted_iso3 = extract_iso3_from_df(df_restrict, allowed_set)
+    fiat_codes = extract_currency_codes_from_df(df_currency)
+
+    # currency_mode: DEFAULT TO LIST if we have a list.
+    # Only set ALL_FIAT if file explicitly says "all currencies" (rare) — we keep it conservative.
+    currency_mode = "LIST" if fiat_codes else "ALL_FIAT"
+
+    return {
+        "sheet_names": sheets,
+        "restrict_sheet": restrict_sheet,
+        "currency_sheet": currency_sheet,
+        "restricted_iso3": restricted_iso3,
+        "fiat_codes": fiat_codes,
+        "currency_mode_suggested": currency_mode,
+    }
+
+
+def ai_suggest_provider_name_and_notes(file_name: str, sheet_names: list[str], counts: dict) -> dict:
+    """
+    AI only does: provider name + notes.
+    Codes are extracted deterministically (no AI guessing).
+    """
+    client = get_openai_client()
+    if not client:
+        return {"provider_name": Path(file_name).stem, "notes": "AI disabled (missing API key)."}
+
+    payload = {
+        "file_name": file_name,
+        "sheet_names": sheet_names,
+        "counts": counts,
+        "instruction": "Suggest a clean provider_name from the file name. Return JSON with provider_name and notes only.",
+    }
+
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Return ONLY valid JSON. No extra text."},
+            {"role": "user", "content": json.dumps(payload)},
+        ],
+        temperature=0.2,
+    )
+
+    text = (resp.choices[0].message.content or "").strip()
+    try:
+        data = json.loads(text)
+        provider_name = str(data.get("provider_name", "")).strip() or Path(file_name).stem
+        notes = str(data.get("notes", "")).strip()
+        return {"provider_name": provider_name, "notes": notes}
+    except Exception:
+        return {"provider_name": Path(file_name).stem, "notes": "AI returned invalid JSON; using file name."}
 
 # =================================================
 # App start
@@ -333,12 +396,10 @@ if search:
     where.append("LOWER(p.provider_name) LIKE ?")
     params.append(f"%{search.lower()}%")
 
-# exclude providers restricted in selected country
 if country_iso:
     where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code=?)")
     params.append(country_iso)
 
-# currency matching
 if currency:
     where.append(
         """
@@ -446,60 +507,83 @@ else:
 # =================================================
 if is_admin():
     with st.expander("Admin: AI Agent — Import provider from Excel", expanded=False):
-        st.caption("Upload an Excel provider pack. AI suggests provider name, currency mode, and restricted countries. You review before applying.")
+        st.caption(
+            "This importer is now deterministic for codes (more accurate): "
+            "it extracts restricted ISO3 + currency codes directly from the Excel. "
+            "AI only suggests provider name + notes."
+        )
 
-        client = get_openai_client()
-        if not client:
-            st.warning("OPENAI_API_KEY is missing. Add it to Streamlit Secrets to use AI import.")
-        else:
-            up = st.file_uploader("Upload Excel (.xlsx)", type=["xlsx"], key="ai_import_uploader")
+        up = st.file_uploader("Upload Excel (.xlsx)", type=["xlsx"], key="ai_import_uploader")
 
-            if up is not None:
-                file_bytes = up.getvalue()
-                preview = read_excel_preview(file_bytes)
+        if up is not None:
+            extracted = read_excel_extract(up.getvalue(), allowed_iso3)
 
-                st.write("Detected sheets:")
-                st.write(preview["sheet_names"])
+            st.write("Detected sheets:", extracted["sheet_names"])
+            st.write("Detected restriction sheet:", extracted["restrict_sheet"] or "Not found")
+            st.write("Detected currency sheet:", extracted["currency_sheet"] or "Not found")
 
-                if preview["restricted_lines"]:
-                    with st.expander("Preview: Restricted countries text", expanded=False):
-                        st.write(preview["restricted_lines"][:40])
+            # AI suggests a clean name + notes
+            if st.button("Run extraction", key="btn_run_ai"):
+                ai_meta = ai_suggest_provider_name_and_notes(
+                    up.name,
+                    extracted["sheet_names"],
+                    counts={
+                        "restricted_iso3_count": len(extracted["restricted_iso3"]),
+                        "fiat_codes_count": len(extracted["fiat_codes"]),
+                    },
+                )
+                st.session_state["ai_import_plan"] = {
+                    "provider_name": ai_meta["provider_name"],
+                    "notes": ai_meta["notes"],
+                    "currency_mode": extracted["currency_mode_suggested"],
+                    "restricted_iso3": extracted["restricted_iso3"],
+                    "fiat_codes": extracted["fiat_codes"],
+                }
 
-                if preview["currency_lines"]:
-                    with st.expander("Preview: Supported currencies text", expanded=False):
-                        st.write(preview["currency_lines"][:40])
+            plan = st.session_state.get("ai_import_plan", None)
+            if plan:
+                st.success("Plan ready. Review and apply if correct.")
+                st.json(
+                    {
+                        "provider_name": plan["provider_name"],
+                        "currency_mode": plan["currency_mode"],
+                        "restricted_iso3_count": len(plan["restricted_iso3"]),
+                        "fiat_codes_count": len(plan["fiat_codes"]),
+                        "notes": plan["notes"],
+                    }
+                )
 
-                if st.button("Run AI extraction", key="btn_run_ai"):
-                    plan = ai_extract_plan(up.name, preview, allowed_iso3)
-                    st.session_state["ai_plan"] = plan
+                provider_name = st.text_input(
+                    "Provider name (edit if needed)",
+                    value=plan["provider_name"],
+                    key="ai_provider_name",
+                )
 
-                plan = st.session_state.get("ai_plan", None)
-                if isinstance(plan, dict) and plan:
-                    if "error" in plan:
-                        st.error(plan["error"])
-                    else:
-                        st.success("AI plan ready. Review and apply if correct.")
-                        st.json(plan)
+                currency_mode = st.selectbox(
+                    "Currency mode",
+                    ["ALL_FIAT", "LIST"],
+                    index=0 if plan["currency_mode"] == "ALL_FIAT" else 1,
+                    key="ai_currency_mode",
+                )
 
-                        provider_name = st.text_input(
-                            "Provider name (edit if needed)",
-                            value=plan.get("provider_name", ""),
-                            key="ai_provider_name",
-                        )
-                        currency_mode = st.selectbox(
-                            "Currency mode",
-                            ["ALL_FIAT", "LIST"],
-                            index=0 if plan.get("currency_mode") == "ALL_FIAT" else 1,
-                            key="ai_currency_mode",
-                        )
+                st.markdown("#### Restricted countries (extracted)")
+                chips(plan["restricted_iso3"], "#4B1E2F")
 
-                        st.markdown("Restricted countries (AI)")
-                        chips(plan.get("restricted_iso3", []), "#4B1E2F")
+                st.markdown("#### Supported FIAT currencies (extracted)")
+                if plan["fiat_codes"]:
+                    # show only first 80 as chips to keep UI fast
+                    chips(plan["fiat_codes"][:80], "#1F6F43")
+                    if len(plan["fiat_codes"]) > 80:
+                        st.caption(f"Showing first 80 of {len(plan['fiat_codes'])} currency codes.")
+                else:
+                    st.write("None detected")
 
-                        if st.button("Apply AI import to database", type="primary", key="btn_apply_ai"):
-                            pid = upsert_provider_by_name(provider_name, currency_mode)
-                            replace_ai_restrictions(pid, plan.get("restricted_iso3", []))
-                            st.success(f"Imported ✅ {provider_name} (ID: {pid})")
-                            st.cache_data.clear()
+                if st.button("Apply import to database", type="primary", key="btn_apply_ai"):
+                    pid = upsert_provider_by_name(provider_name, currency_mode)
+                    replace_ai_restrictions(pid, plan["restricted_iso3"])
+                    if currency_mode == "LIST":
+                        replace_ai_fiat_currencies(pid, plan["fiat_codes"])
+                    st.success(f"Imported ✅ {provider_name} (ID: {pid})")
+                    st.cache_data.clear()
 
-st.caption("Tip: Always review AI results before applying.")
+st.caption("Tip: The importer now extracts codes directly from Excel, so it should match your sheet content.")
