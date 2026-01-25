@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from pathlib import Path
 
@@ -10,40 +11,62 @@ st.set_page_config(page_title="Game Providers", layout="wide")
 
 
 # -------------------------
-# Auth (Admin login)
+# Auth helpers
 # -------------------------
+def get_admin_password() -> str:
+    """
+    Reads admin password from Streamlit Cloud Secrets first, then env var.
+    - Streamlit Cloud: Secrets -> ADMIN_PASSWORD = "..."
+    - Local: set environment variable ADMIN_PASSWORD
+    """
+    if "ADMIN_PASSWORD" in st.secrets:
+        return str(st.secrets["ADMIN_PASSWORD"])
+    return os.getenv("ADMIN_PASSWORD", "")
+
+
 def is_admin() -> bool:
+    return bool(st.session_state.get("is_admin", False))
+
+
+def logout():
+    st.session_state["is_admin"] = False
+    st.session_state["admin_user"] = ""
+    st.session_state["login_error"] = ""
+
+
+def login_box():
     """
-    Simple admin gate using Streamlit Secrets:
-      - In Streamlit Cloud -> App -> Settings -> Secrets
-      - Add: ADMIN_PASSWORD = "yourpassword"
+    Sidebar login UI. Admin panel is visible only if is_admin() is True.
     """
-    admin_pw = st.secrets.get("ADMIN_PASSWORD", "")
-    if not admin_pw:
-        # No secret configured => admin disabled
-        return False
+    st.sidebar.markdown("## Access")
 
-    # Keep login state in the session
-    if "is_admin" not in st.session_state:
-        st.session_state["is_admin"] = False
+    if is_admin():
+        st.sidebar.success("Logged in as Admin")
+        if st.sidebar.button("Logout"):
+            logout()
+        return
 
-    with st.sidebar:
-        st.markdown("### Admin login")
-        entered = st.text_input("Password", type="password", key="admin_pw")
-        colA, colB = st.columns([1, 1])
-        with colA:
-            if st.button("Log in", use_container_width=True):
-                st.session_state["is_admin"] = (entered == admin_pw)
-        with colB:
-            if st.button("Log out", use_container_width=True):
-                st.session_state["is_admin"] = False
+    st.sidebar.info("Login required for Admin editing")
 
-        if st.session_state["is_admin"]:
-            st.success("Admin mode enabled")
+    user = st.sidebar.text_input("Username", value="", key="admin_user")
+    pw = st.sidebar.text_input("Password", value="", type="password", key="admin_password")
+
+    if st.sidebar.button("Login"):
+        real_pw = get_admin_password()
+        if not real_pw:
+            st.session_state["login_error"] = (
+                "ADMIN_PASSWORD is not configured. Add it in Streamlit Secrets."
+            )
+        elif pw == real_pw:
+            st.session_state["is_admin"] = True
+            st.session_state["login_error"] = ""
+            st.sidebar.success("Login successful ✅")
         else:
-            st.caption("Admin panel is hidden unless you log in.")
+            st.session_state["login_error"] = "Wrong password ❌"
 
-    return bool(st.session_state["is_admin"])
+    err = st.session_state.get("login_error", "")
+    if err:
+        st.sidebar.error(err)
 
 
 # -------------------------
@@ -87,12 +110,12 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
     """
     codes = qdf(
         "SELECT DISTINCT country_code AS iso3 FROM restrictions "
-        "WHERE country_code IS NOT NULL AND country_code <> '' ORDER BY country_code"
+        "WHERE country_code IS NOT NULL AND country_code <> '' "
+        "ORDER BY country_code"
     )
     countries_ref = load_countries_table()
 
     if countries_ref.empty:
-        # fallback: show ISO3 only
         codes["label"] = codes["iso3"]
         return codes[["iso3", "label"]]
 
@@ -104,14 +127,13 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
 # -------------------------
 # App start
 # -------------------------
+login_box()  # sidebar auth
+
 st.title("Game Providers")
 
 if not DB_PATH.exists():
     st.error("Database not found. Run: py db_init.py  then  py importer.py")
     st.stop()
-
-# Evaluate admin (also renders sidebar login)
-ADMIN = is_admin()
 
 countries_ref = load_countries_table()
 
@@ -119,17 +141,13 @@ countries_ref = load_countries_table()
 # Filters
 # -------------------------
 country_choices_df = load_country_labels_from_restrictions()
-
 fiat = qdf(
-    "SELECT DISTINCT currency_code FROM currencies "
-    "WHERE currency_type='FIAT' ORDER BY currency_code"
+    "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
 )["currency_code"].tolist()
-
 statuses = qdf("SELECT DISTINCT status FROM providers ORDER BY status")["status"].tolist()
 
 col1, col2, col3 = st.columns(3)
 
-# Country filter: show human readable label, store ISO3 internally
 country_labels = country_choices_df["label"].tolist()
 country_label_to_iso3 = dict(zip(country_choices_df["label"], country_choices_df["iso3"]))
 
@@ -160,22 +178,20 @@ if country_iso3:
     params.append(country_iso3)
 
 # currency support:
-# - ALL_FIAT always supports the chosen fiat
-# - LIST supports if currency exists in currencies as FIAT
 if currency:
     where.append(
         """
-      (
-        p.currency_mode = 'ALL_FIAT'
-        OR
-        (p.currency_mode = 'LIST' AND EXISTS (
-           SELECT 1 FROM currencies c
-           WHERE c.provider_id = p.provider_id
-             AND c.currency_type='FIAT'
-             AND c.currency_code = ?
-        ))
-      )
-    """
+        (
+          p.currency_mode = 'ALL_FIAT'
+          OR
+          (p.currency_mode = 'LIST' AND EXISTS (
+             SELECT 1 FROM currencies c
+             WHERE c.provider_id = p.provider_id
+               AND c.currency_type='FIAT'
+               AND c.currency_code = ?
+          ))
+        )
+        """
     )
     params.append(currency)
 
@@ -183,28 +199,28 @@ where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
 df = qdf(
     f"""
-SELECT
-  p.provider_id,
-  p.provider_name,
-  p.currency_mode,
-  p.status
-FROM providers p
-{where_sql}
-ORDER BY p.provider_name
-""",
+    SELECT
+      p.provider_id,
+      p.provider_name,
+      p.currency_mode,
+      p.status
+    FROM providers p
+    {where_sql}
+    ORDER BY p.provider_name
+    """,
     tuple(params),
 )
 
 st.subheader("Results")
 st.dataframe(df, use_container_width=True, hide_index=True)
 
+
 # -------------------------
-# Admin panel (only visible for admins)
+# Admin panel (ONLY if logged in)
 # -------------------------
-if ADMIN:
+if is_admin():
     with st.expander("Admin: Edit provider data", expanded=False):
         pid = st.number_input("provider_id", min_value=1, step=1)
-
         if pid:
             prov = qdf("SELECT * FROM providers WHERE provider_id=?", (pid,))
             if prov.empty:
@@ -212,10 +228,9 @@ if ADMIN:
             else:
                 st.write("Provider:", prov.iloc[0].to_dict())
 
-                # ---- Add restriction
+                # Add restriction
                 st.markdown("### Add restriction")
 
-                # Prefer dropdown by country name if countries table exists
                 if not countries_ref.empty:
                     admin_country_label = st.selectbox(
                         "Country to restrict",
@@ -241,9 +256,8 @@ if ADMIN:
                     else:
                         st.warning("Choose a country (or enter ISO3) first.")
 
-                # ---- Remove restriction
+                # Remove restriction
                 st.markdown("### Remove restriction")
-
                 existing_df = qdf(
                     "SELECT country_code FROM restrictions WHERE provider_id=? ORDER BY country_code",
                     (pid,),
@@ -255,20 +269,12 @@ if ADMIN:
                         tmp = pd.DataFrame({"iso3": existing_codes})
                         tmp = tmp.merge(countries_ref[["iso3", "label"]], on="iso3", how="left")
                         tmp["label"] = tmp["label"].fillna(tmp["iso3"])
-                        rem_label = st.selectbox(
-                            "Choose to remove",
-                            [""] + tmp["label"].tolist(),
-                            key="admin_remove_country",
-                        )
+                        rem_label = st.selectbox("Choose to remove", [""] + tmp["label"].tolist(), key="admin_remove_country")
                         rem_code = ""
                         if rem_label:
                             rem_code = rem_label.split("(")[-1].replace(")", "").strip() if "(" in rem_label else rem_label
                     else:
-                        rem_code = st.selectbox(
-                            "Choose to remove (ISO3)",
-                            [""] + existing_codes,
-                            key="admin_remove_country",
-                        )
+                        rem_code = st.selectbox("Choose to remove (ISO3)", [""] + existing_codes, key="admin_remove_country")
 
                     if st.button("Remove selected restriction"):
                         if rem_code:
@@ -285,7 +291,7 @@ if ADMIN:
                 else:
                     st.info("No restrictions found for this provider.")
 
-                # ---- Add currency
+                # Add currency
                 st.markdown("### Add currency")
                 ccode = st.text_input("Currency code (e.g. BRL, USD)", key="ccode").strip().upper()
                 ctype = st.selectbox("Type", ["FIAT", "CRYPTO"])
@@ -307,7 +313,7 @@ if ADMIN:
                     else:
                         st.warning("Enter a currency code first.")
 
-                # ---- Remove currency
+                # Remove currency
                 st.markdown("### Remove currency")
                 cur = qdf(
                     "SELECT currency_code || ' (' || currency_type || ')' AS label "
@@ -332,9 +338,8 @@ if ADMIN:
                     else:
                         st.warning("Pick a currency to remove.")
 else:
-    st.info("Admin panel is hidden. Use the sidebar login to enable admin mode (requires ADMIN_PASSWORD secret).")
+    st.info("Admin editing is hidden. Login in the sidebar to edit provider data.")
 
-st.info(
-    "To re-import from files, run: py importer.py  (it replaces imported restrictions/currencies from those files). "
-    "Manual edits are kept only if you don't re-import that provider."
+st.caption(
+    "Re-import from files by running: py importer.py (replaces imported restrictions/currencies for those providers)."
 )
