@@ -176,7 +176,9 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
 # -------------------------
 login_box()  # sidebar auth
 
-st.title("Game Providers")
+st.markdown("## Game Providers")
+st.caption("Browse providers by country restriction and supported FIAT currency.")
+
 
 if not DB_PATH.exists():
     st.error("Database not found. Run: py db_init.py  then  py importer.py")
@@ -191,18 +193,18 @@ country_choices_df = load_country_labels_from_restrictions()
 fiat = qdf(
     "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
 )["currency_code"].tolist()
-statuses = qdf("SELECT DISTINCT status FROM providers ORDER BY status")["status"].tolist()
 
-col1, col2, col3 = st.columns(3)
+with st.container(border=True):
+    st.subheader("Filters")
+    f1, f2, f3 = st.columns([2, 1, 1])
 
-country_labels = country_choices_df["label"].tolist()
-country_label_to_iso3 = dict(zip(country_choices_df["label"], country_choices_df["iso3"]))
+    selected_country_label = f1.selectbox("Country", [""] + country_labels, index=0)
+    country_iso3 = country_label_to_iso3.get(selected_country_label, "")
 
-selected_country_label = col1.selectbox("Country", [""] + country_labels, index=0)
-country_iso3 = country_label_to_iso3.get(selected_country_label, "")
+    currency = f2.selectbox("Currency (FIAT)", [""] + fiat, index=0)
 
-currency = col2.selectbox("Currency (FIAT)", [""] + fiat, index=0)
-status = col3.selectbox("Status", [""] + statuses, index=0)
+    provider_search = f3.text_input("Search provider", value="")
+
 
 st.caption(
     "Rules: providers with currency_mode=ALL_FIAT match any FIAT currency (even if not listed). "
@@ -211,13 +213,14 @@ st.caption(
 
 # -------------------------
 # Query building
+if provider_search:
+    where.append("LOWER(p.provider_name) LIKE ?")
+    params.append(f"%{provider_search.lower()}%")
+
 # -------------------------
 params = []
 where = []
 
-if status:
-    where.append("p.status = ?")
-    params.append(status)
 
 # country restriction: exclude providers that have that country in restrictions
 if country_iso3:
@@ -248,18 +251,30 @@ df = qdf(
     f"""
     SELECT
       p.provider_id,
-      p.provider_name,
-      p.currency_mode,
-      p.status
+      p.provider_name
     FROM providers p
     {where_sql}
     ORDER BY p.provider_name
     """,
     tuple(params),
 )
+# Rename columns for UI
+df = df.rename(columns={
+    "provider_id": "ID",
+    "provider_name": "Game Provider",
+})
+
 
 st.subheader("Results")
-st.dataframe(df, use_container_width=True, hide_index=True)
+st.dataframe(
+    df,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "ID": st.column_config.NumberColumn("ID", width="small"),
+        "Game Provider": st.column_config.TextColumn("Game Provider", width="large"),
+    },
+)
 
 
 # -------------------------
