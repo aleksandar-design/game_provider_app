@@ -1,0 +1,4 @@
+provider_id,provider_name,file_name,status,currency_mode,restrictions_sheet,restrictions_range,currencies_sheet,fiat_range,crypto_range,all_fiat_hint_sheet,all_fiat_hint_cell,all_fiat_hint_regex,notes
+,,Ela Games Main Data.xlsx,DRAFT,LIST,Restricted areas,A2:A,Supported currencies,A2:A,,,,,
+,,Mascot Gaming Main DATA.xlsx,DRAFT,LIST,Restricted countries,A2:A,Supported currencies,A2:A,,,,,
+,,Pragmatic Play Main DATA.xlsx,DRAFT,LIST,Restricted countries,A2:A,Supported currencies,A2:A,,,,,
