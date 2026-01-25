@@ -1,11 +1,12 @@
-# Local DB and data
-db/
-data_sources/
+# Local database
+db/database.sqlite
 
-# Generated configs
-config_generated.csv
+# Excel source files
+data_sources/*.xlsx
 
-# Python junk
+# Python cache
 __pycache__/
 *.pyc
+
+# Environment
 .env
