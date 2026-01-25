@@ -225,22 +225,25 @@ st.caption(
 )
 
 # -------------------------
-# Query building
-if provider_search:
-    where.append("LOWER(p.provider_name) LIKE ?")
-    params.append(f"%{provider_search.lower()}%")
+# -------------------------
+provider_search = f3.text_input("Search provider", value="")
 
+# Query building
 # -------------------------
 params = []
 where = []
 
+# Provider search
+if provider_search:
+    where.append("LOWER(p.provider_name) LIKE ?")
+    params.append(f"%{provider_search.lower()}%")
 
-# country restriction: exclude providers that have that country in restrictions
+# Country restriction
 if country_iso3:
     where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code = ?)")
     params.append(country_iso3)
 
-# currency support:
+# Currency support
 if currency:
     where.append(
         """
@@ -259,6 +262,7 @@ if currency:
     params.append(currency)
 
 where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
 
 df = qdf(
     f"""
