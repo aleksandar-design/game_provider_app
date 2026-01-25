@@ -1,0 +1,13 @@
+# Local database
+db/database.sqlite
+
+# Provider source files
+data_sources/
+
+# Generated files
+config_generated.csv
+
+# Python junk
+__pycache__/
+*.pyc
+.env
