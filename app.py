@@ -149,6 +149,24 @@ def load_countries_table() -> pd.DataFrame:
         return df
     except Exception:
         return pd.DataFrame(columns=["iso3", "name", "label"])
+def chips(items: list[str], color: str = "#2D3A66"):
+    if not items:
+        st.write("None ✅")
+        return
+    html = ""
+    for i in items:
+        html += f"""
+        <span style="
+            display:inline-block;
+            padding:6px 10px;
+            margin:4px;
+            border-radius:12px;
+            background:{color};
+            font-size:0.85rem;">
+            {i}
+        </span>
+        """
+    st.markdown(html, unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -235,8 +253,16 @@ fiat = qdf(
 )["currency_code"].tolist()
 
 with st.container(border=True):
-    st.subheader("Filters")
+    h1, h2 = st.columns([3, 1])
+    h1.subheader("Filters")
+
+    if h2.button("Clear filters", key="clear_filters"):
+        st.session_state["filter_country"] = ""
+        st.session_state["filter_currency"] = ""
+        st.session_state["filter_provider_search"] = ""
+
     f1, f2, f3 = st.columns([2, 1, 1])
+
 
     selected_country_label = f1.selectbox(
         "Country",
@@ -333,7 +359,16 @@ c4.metric("Currency", currency if currency else "Any")
 # -------------------------
 # Results
 # -------------------------
-st.subheader("Results")
+r1, r2 = st.columns([3, 1])
+r1.subheader("Results")
+
+r2.download_button(
+    "Export CSV",
+    data=df.to_csv(index=False),
+    file_name="game_providers_results.csv",
+    mime="text/csv",
+)
+
 st.dataframe(
     df,
     use_container_width=True,
@@ -377,17 +412,24 @@ else:
                 b.markdown(f"**ID:** {prov.get('provider_id')}")
                 c.markdown(f"**Currency Mode:** {prov.get('currency_mode')}")
 
-                st.markdown("#### Restricted countries")
-                if restrictions:
-                    st.write(", ".join(restrictions))
-                else:
-                    st.write("None ✅")
+               st.markdown("#### Restricted countries")
+chips(restrictions, color="#4B1E2F")
 
-                st.markdown("#### Currencies")
-                if currencies_df.empty:
-                    st.write("No currencies listed.")
-                else:
-                    st.dataframe(currencies_df, hide_index=True, use_container_width=True)
+
+               st.markdown("#### Currencies")
+if currencies_df.empty:
+    st.write("No currencies listed.")
+else:
+    fiat = currencies_df[currencies_df["currency_type"] == "FIAT"]["currency_code"].tolist()
+    crypto = currencies_df[currencies_df["currency_type"] == "CRYPTO"]["currency_code"].tolist()
+
+    if fiat:
+        st.markdown("**FIAT**")
+        chips(fiat, color="#1F6F43")
+
+    if crypto:
+        st.markdown("**CRYPTO**")
+        chips(crypto, color="#3A3A3A")
 
 # -------------------------
 # Admin panel (ONLY if logged in)
