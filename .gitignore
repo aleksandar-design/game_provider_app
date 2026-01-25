@@ -1,10 +1,8 @@
-# Local database
-db/database.sqlite
-
-# Provider source files
+# Local DB and data
+db/
 data_sources/
 
-# Generated files
+# Generated configs
 config_generated.csv
 
 # Python junk
