@@ -7,9 +7,11 @@ import streamlit as st
 
 DB_PATH = Path("db") / "database.sqlite"
 
+# -------------------------
+# Page config + UI theme polish
+# -------------------------
 st.set_page_config(page_title="Game Providers", layout="wide")
 
-# ---------- UI Styling ----------
 st.markdown(
     """
     <style>
@@ -62,6 +64,11 @@ st.markdown(
 # Auth helpers
 # -------------------------
 def get_admin_password() -> str:
+    """
+    Reads admin password from Streamlit Cloud Secrets first, then env var.
+    - Streamlit Cloud: Secrets -> ADMIN_PASSWORD = "..."
+    - Local: set environment variable ADMIN_PASSWORD
+    """
     if "ADMIN_PASSWORD" in st.secrets:
         return str(st.secrets["ADMIN_PASSWORD"])
     return os.getenv("ADMIN_PASSWORD", "")
@@ -78,6 +85,9 @@ def logout():
 
 
 def login_box():
+    """
+    Sidebar login UI. Admin panel is visible only if is_admin() is True.
+    """
     st.sidebar.markdown("## Access")
 
     if is_admin():
@@ -94,8 +104,10 @@ def login_box():
     if st.sidebar.button("Login", key="btn_login"):
         real_pw = get_admin_password()
         if not real_pw:
-            st.session_state["login_error"] = "ADMIN_PASSWORD is not configured. Add it in Streamlit Secrets."
-        elif st.session_state["admin_password"] == real_pw:
+            st.session_state["login_error"] = (
+                "ADMIN_PASSWORD is not configured. Add it in Streamlit Secrets."
+            )
+        elif st.session_state.get("admin_password", "") == real_pw:
             st.session_state["is_admin"] = True
             st.session_state["login_error"] = ""
             st.sidebar.success("Login successful ✅")
@@ -123,6 +135,9 @@ def qdf(query: str, params=()):
 
 @st.cache_data
 def load_countries_table() -> pd.DataFrame:
+    """
+    Returns countries reference table with iso3 + name (if table exists).
+    """
     if not DB_PATH.exists():
         return pd.DataFrame(columns=["iso3", "name", "label"])
 
@@ -138,6 +153,10 @@ def load_countries_table() -> pd.DataFrame:
 
 @st.cache_data
 def load_country_labels_from_restrictions() -> pd.DataFrame:
+    """
+    Uses restrictions table values (ISO3 codes) and joins to countries table if available.
+    Returns columns: iso3, label
+    """
     codes = qdf(
         "SELECT DISTINCT country_code AS iso3 FROM restrictions "
         "WHERE country_code IS NOT NULL AND country_code <> '' "
@@ -154,10 +173,39 @@ def load_country_labels_from_restrictions() -> pd.DataFrame:
     return merged[["iso3", "label"]]
 
 
+def get_provider_details(provider_id: int) -> dict:
+    """
+    Returns provider core fields + list of restrictions + currencies dataframe.
+    """
+    prov = qdf(
+        "SELECT provider_id, provider_name, currency_mode FROM providers WHERE provider_id=?",
+        (provider_id,),
+    )
+    if prov.empty:
+        return {}
+
+    restrictions = qdf(
+        "SELECT country_code FROM restrictions WHERE provider_id=? ORDER BY country_code",
+        (provider_id,),
+    )["country_code"].tolist()
+
+    currencies = qdf(
+        "SELECT currency_code, currency_type, display FROM currencies WHERE provider_id=? "
+        "ORDER BY currency_type, currency_code",
+        (provider_id,),
+    )
+
+    return {
+        "provider": prov.iloc[0].to_dict(),
+        "restrictions": restrictions,
+        "currencies": currencies,
+    }
+
+
 # -------------------------
 # App start
 # -------------------------
-login_box()
+login_box()  # sidebar auth
 
 st.markdown("## Game Providers")
 st.caption("Browse providers by country restriction and supported FIAT currency.")
@@ -215,7 +263,7 @@ st.caption(
 )
 
 # -------------------------
-# Query building
+# Query building (filters)
 # -------------------------
 params = []
 where = []
@@ -224,10 +272,12 @@ if provider_search:
     where.append("LOWER(p.provider_name) LIKE ?")
     params.append(f"%{provider_search.lower()}%")
 
+# country restriction: exclude providers that have that country in restrictions
 if country_iso3:
     where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code = ?)")
     params.append(country_iso3)
 
+# currency support:
 if currency:
     where.append(
         """
@@ -267,6 +317,18 @@ df = df.rename(
 )
 
 # -------------------------
+# Summary cards
+# -------------------------
+total_providers = int(qdf("SELECT COUNT(*) AS c FROM providers")["c"].iloc[0])
+matching_providers = len(df)
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Total Providers", total_providers)
+c2.metric("Matching", matching_providers)
+c3.metric("Country", selected_country_label if selected_country_label else "Any")
+c4.metric("Currency", currency if currency else "Any")
+
+# -------------------------
 # Results
 # -------------------------
 st.subheader("Results")
@@ -281,11 +343,64 @@ st.dataframe(
 )
 
 # -------------------------
-# Admin panel
+# Provider details panel
+# -------------------------
+st.markdown("### Provider details")
+
+if df.empty:
+    st.info("No providers match your filters.")
+else:
+    options = [f"{row['ID']} — {row['Game Provider']}" for _, row in df.iterrows()]
+
+    selected_option = st.selectbox(
+        "Select a provider to view details",
+        [""] + options,
+        key="provider_details_select",
+    )
+
+    if selected_option:
+        selected_id = int(selected_option.split("—")[0].strip())
+        details = get_provider_details(selected_id)
+
+        if not details:
+            st.warning("Provider not found.")
+        else:
+            prov = details["provider"]
+            restrictions = details["restrictions"]
+            currencies_df = details["currencies"]
+
+            with st.container(border=True):
+                a, b, c = st.columns([2, 1, 1])
+                a.markdown(f"**Game Provider:** {prov.get('provider_name')}")
+                b.markdown(f"**ID:** {prov.get('provider_id')}")
+                c.markdown(f"**Currency Mode:** {prov.get('currency_mode')}")
+
+                st.markdown("#### Restricted countries")
+                if restrictions:
+                    st.write(", ".join(restrictions))
+                else:
+                    st.write("None ✅")
+
+                st.markdown("#### Currencies")
+                if currencies_df.empty:
+                    st.write("No currencies listed.")
+                else:
+                    st.dataframe(currencies_df, hide_index=True, use_container_width=True)
+
+# -------------------------
+# Admin panel (ONLY if logged in)
 # -------------------------
 if is_admin():
     with st.expander("Admin: Edit provider data", expanded=False):
-        pid = st.number_input("provider_id", min_value=1, step=1, key="admin_pid")
+        providers_all = qdf("SELECT provider_id, provider_name FROM providers ORDER BY provider_name")
+        admin_options = [f"{r['provider_id']} — {r['provider_name']}" for _, r in providers_all.iterrows()]
+
+        pick_admin = st.selectbox("Select provider", [""] + admin_options, key="admin_pick_provider")
+
+        pid = 0
+        if pick_admin:
+            pid = int(pick_admin.split("—")[0].strip())
+
         if pid:
             prov = qdf("SELECT * FROM providers WHERE provider_id=?", (pid,))
             if prov.empty:
@@ -306,7 +421,11 @@ if is_admin():
                     if admin_country_label:
                         new_cc = admin_country_label.split("(")[-1].replace(")", "").strip()
                 else:
-                    new_cc = st.text_input("Country code (ISO3, e.g. GBR, USA)", value="", key="admin_cc").strip().upper()
+                    new_cc = st.text_input(
+                        "Country code (ISO3, e.g. GBR, USA)",
+                        value="",
+                        key="admin_cc",
+                    ).strip().upper()
 
                 if st.button("Add restricted country", key="btn_add_restriction"):
                     if new_cc:
@@ -341,7 +460,11 @@ if is_admin():
                         )
                         rem_code = ""
                         if rem_label:
-                            rem_code = rem_label.split("(")[-1].replace(")", "").strip() if "(" in rem_label else rem_label
+                            rem_code = (
+                                rem_label.split("(")[-1].replace(")", "").strip()
+                                if "(" in rem_label
+                                else rem_label
+                            )
                     else:
                         rem_code = st.selectbox(
                             "Choose to remove (ISO3)",
@@ -366,9 +489,16 @@ if is_admin():
 
                 # Add currency
                 st.markdown("### Add currency")
-                ccode = st.text_input("Currency code (e.g. BRL, USD)", key="admin_currency_code").strip().upper()
+                ccode = st.text_input(
+                    "Currency code (e.g. BRL, USD)",
+                    key="admin_currency_code",
+                ).strip().upper()
                 ctype = st.selectbox("Type", ["FIAT", "CRYPTO"], key="admin_currency_type")
-                display = st.checkbox("Display (show in app)", value=(ctype == "FIAT"), key="admin_currency_display")
+                display = st.checkbox(
+                    "Display (show in app)",
+                    value=(ctype == "FIAT"),
+                    key="admin_currency_display",
+                )
 
                 if st.button("Add currency", key="btn_add_currency"):
                     if ccode:
@@ -413,4 +543,6 @@ if is_admin():
 else:
     st.info("Admin editing is hidden. Login in the sidebar to edit provider data.")
 
-st.caption("Re-import from files by running: py importer.py (replaces imported restrictions/currencies for those providers).")
+st.caption(
+    "Re-import from files by running: py importer.py (replaces imported restrictions/currencies for those providers)."
+)
