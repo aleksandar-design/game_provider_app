@@ -8,6 +8,53 @@ import streamlit as st
 DB_PATH = Path("db") / "database.sqlite"
 
 st.set_page_config(page_title="Game Providers", layout="wide")
+st.markdown(
+    """
+    <style>
+      /* Page padding */
+      .block-container { padding-top: 1.25rem; padding-bottom: 2.5rem; }
+
+      /* Reduce top empty space */
+      header[data-testid="stHeader"] { height: 0rem; }
+
+      /* Sidebar styling */
+      section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(17,26,51,1) 0%, rgba(11,16,32,1) 100%);
+        border-right: 1px solid rgba(255,255,255,0.06);
+      }
+
+      /* Make titles look nicer */
+      h1, h2, h3 { letter-spacing: -0.02em; }
+
+      /* Card look for containers (we'll use st.container(border=True)) */
+      div[data-testid="stVerticalBlockBorderWrapper"] {
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        background: rgba(255,255,255,0.02);
+      }
+
+      /* Buttons */
+      .stButton>button {
+        border-radius: 12px;
+        padding: 0.55rem 0.95rem;
+        border: 1px solid rgba(255,255,255,0.10);
+      }
+
+      /* Inputs */
+      .stTextInput input, .stSelectbox div, .stMultiSelect div {
+        border-radius: 12px !important;
+      }
+
+      /* Dataframe rounding */
+      div[data-testid="stDataFrame"] {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # -------------------------
