@@ -190,6 +190,14 @@ countries_ref = load_countries_table()
 # Filters
 # -------------------------
 country_choices_df = load_country_labels_from_restrictions()
+# --- Build country labels safely (so we never get NameError) ---
+if country_choices_df is None or country_choices_df.empty:
+    country_labels = []
+    country_label_to_iso3 = {}
+else:
+    country_labels = country_choices_df["label"].dropna().tolist()
+    country_label_to_iso3 = dict(zip(country_choices_df["label"], country_choices_df["iso3"]))
+
 fiat = qdf(
     "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
 )["currency_code"].tolist()
@@ -198,12 +206,17 @@ with st.container(border=True):
     st.subheader("Filters")
     f1, f2, f3 = st.columns([2, 1, 1])
 
-    selected_country_label = f1.selectbox("Country", [""] + country_labels, index=0)
+    selected_country_label = f1.selectbox(
+        "Country",
+        [""] + country_labels,
+        index=0,
+    )
     country_iso3 = country_label_to_iso3.get(selected_country_label, "")
 
     currency = f2.selectbox("Currency (FIAT)", [""] + fiat, index=0)
 
     provider_search = f3.text_input("Search provider", value="")
+
 
 
 st.caption(
