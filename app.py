@@ -219,15 +219,17 @@ countries_ref = load_countries_table()
 # -------------------------
 # Filters
 # -------------------------
-country_choices_df = load_country_labels_from_restrictions()
+country_choices_df = load_countries_table()
 
+# --- Build country labels from ALL countries table ---
 if country_choices_df is None or country_choices_df.empty:
     country_labels = []
     country_label_to_iso3 = {}
 else:
+    # load_countries_table already creates "label" like: Turkey (TUR)
     country_labels = country_choices_df["label"].dropna().tolist()
     country_label_to_iso3 = dict(zip(country_choices_df["label"], country_choices_df["iso3"]))
-
+    
 fiat = qdf(
     "SELECT DISTINCT currency_code FROM currencies WHERE currency_type='FIAT' ORDER BY currency_code"
 )["currency_code"].tolist()
