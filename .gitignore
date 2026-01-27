@@ -1,5 +1,6 @@
 # Local database
 db/database.sqlite
+db/staging.sqlite
 
 # Excel source files
 data_sources/*.xlsx
@@ -10,3 +11,10 @@ __pycache__/
 
 # Environment
 .env
+.streamlit/secrets.toml
+
+# Google service account credentials
+service_account.json
+
+# Database backups
+db/backups/

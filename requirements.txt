@@ -1,3 +1,6 @@
 streamlit
 pandas
 openai>=1.40.0
+google-api-python-client
+google-auth
+openpyxl

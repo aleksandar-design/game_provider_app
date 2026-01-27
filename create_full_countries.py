@@ -1,7 +1,13 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 import pycountry
+
+# Fix Windows console encoding for emoji support
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 DB_PATH = Path("db") / "database.sqlite"
 

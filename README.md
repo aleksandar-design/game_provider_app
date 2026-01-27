@@ -20,11 +20,16 @@ A Streamlit web application for managing game provider data, including country r
 
 - **Browse Providers**: View all game providers in a searchable, filterable table
 - **Filter by Country**: Find providers that are NOT restricted in a specific country
-- **Filter by Currency**: Find providers that support a specific FIAT currency
+- **Filter by Currency**: Find providers that support a specific FIAT or Crypto currency
 - **Provider Details**: View restricted countries and supported currencies for each provider
-- **Export to CSV**: Download filtered results as CSV
+- **Export to Excel**: Download filtered results as Excel file
 - **Admin Panel**: AI-assisted import of provider data from Excel files
-- **Dark Theme**: Modern dark UI with purple accents
+- **Google Sheets Sync**: Automatic import from Google Drive folder
+- **Three-tier Restrictions**: Distinguishes BLOCKED, CONDITIONAL, and REGULATED countries
+- **Separate Currency Tables**: FIAT and Crypto currencies stored in separate tables
+- **Database Backups**: Automatic backups before each sync
+- **Persistent Login**: "Keep me signed in" option to stay logged in across page refreshes
+- **Light/Dark Theme**: Toggle between light and dark modes (preference persists in URL)
 
 ---
 
@@ -34,27 +39,27 @@ A Streamlit web application for managing game provider data, including country r
 game_provider_app/
 ├── app.py                  # Main Streamlit application
 ├── db_init.py              # Database schema initialization
+├── google_sync.py          # Google Sheets sync script (NEW)
 ├── importer.py             # Batch import from Excel via config.csv
 ├── create_countries.py     # Populate countries table (basic list)
 ├── create_full_countries.py # Populate countries table (full ISO list)
 ├── generate_config.py      # Auto-generate config.csv from Excel files
 ├── inspect_xlsx.py         # Debug tool to inspect Excel structure
 ├── config.csv              # Configuration for batch import
-├── config_generated.csv    # Auto-generated config (template)
 ├── requirements.txt        # Python dependencies
-├── .env                    # Environment variables (secrets)
+├── service_account.json    # Google service account key (not in git)
 ├── .env.example            # Environment variables template
 ├── .gitignore              # Git ignore rules
 ├── .streamlit/
-│   └── config.toml         # Streamlit theme configuration
+│   ├── config.toml         # Streamlit theme configuration
+│   └── secrets.toml        # Secrets (not in git)
 ├── .devcontainer/
 │   └── devcontainer.json   # VS Code / GitHub Codespaces config
 ├── db/
-│   └── database.sqlite     # SQLite database (created on init)
+│   ├── database.sqlite     # Main database (production)
+│   ├── staging.sqlite      # Staging database (safe import target)
+│   └── backups/            # Automatic database backups
 └── data_sources/           # Excel files for import (.xlsx)
-    ├── Ela Games Main Data.xlsx
-    ├── Mascot Gaming Main DATA.xlsx
-    └── Pragmatic Play Main DATA.xlsx
 ```
 
 ---
@@ -70,6 +75,8 @@ The app uses SQLite with the following tables:
 | provider_name | TEXT | Provider display name |
 | status | TEXT | DRAFT or ACTIVE |
 | currency_mode | TEXT | LIST (specific currencies) or ALL_FIAT (supports all) |
+| google_sheet_id | TEXT | Google Sheet ID (for sync tracking) |
+| last_synced | TEXT | Last sync timestamp |
 | notes | TEXT | Optional notes |
 
 ### `restrictions`
@@ -77,16 +84,35 @@ The app uses SQLite with the following tables:
 |--------|------|-------------|
 | provider_id | INTEGER | Foreign key to providers |
 | country_code | TEXT | ISO3 country code (e.g., USA, GBR) |
+| restriction_type | TEXT | **BLOCKED** (fully blocked), **CONDITIONAL** (can open with docs), or **REGULATED** (requires license) |
 | source | TEXT | Import source identifier |
 
-### `currencies`
+### `fiat_currencies`
 | Column | Type | Description |
 |--------|------|-------------|
 | provider_id | INTEGER | Foreign key to providers |
-| currency_code | TEXT | ISO4217 code (e.g., USD, EUR) or crypto symbol |
+| currency_code | TEXT | ISO4217 code (e.g., USD, EUR, GBP) |
+| display | INTEGER | 1 = visible, 0 = hidden |
+| source | TEXT | Import source identifier |
+
+### `crypto_currencies`
+| Column | Type | Description |
+|--------|------|-------------|
+| provider_id | INTEGER | Foreign key to providers |
+| currency_code | TEXT | Crypto symbol (e.g., BTC, ETH, USDT) |
+| display | INTEGER | 1 = visible, 0 = hidden |
+| source | TEXT | Import source identifier |
+
+### `currencies` (Legacy)
+| Column | Type | Description |
+|--------|------|-------------|
+| provider_id | INTEGER | Foreign key to providers |
+| currency_code | TEXT | ISO4217 code or crypto symbol |
 | currency_type | TEXT | FIAT or CRYPTO |
 | display | INTEGER | 1 = visible, 0 = hidden |
 | source | TEXT | Import source identifier |
+
+> **Note**: The `currencies` table is kept for backwards compatibility. New data is written to both the new separate tables and the legacy table.
 
 ### `countries`
 | Column | Type | Description |
@@ -97,6 +123,26 @@ The app uses SQLite with the following tables:
 
 ### `overrides_log`
 Audit log for tracking changes (timestamp, action, details).
+
+### `sync_log`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| ts | TEXT | Timestamp |
+| provider_name | TEXT | Provider that was synced |
+| sheet_id | TEXT | Google Sheet ID |
+| status | TEXT | SUCCESS or FAILED |
+| message | TEXT | Status message |
+| restrictions_count | INTEGER | Number of restrictions imported |
+| currencies_count | INTEGER | Number of currencies imported |
+
+### `backups`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| ts | TEXT | Backup timestamp |
+| filename | TEXT | Backup filename |
+| size_bytes | INTEGER | File size |
 
 ---
 
@@ -124,9 +170,23 @@ source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 4. Configure secrets
+
+**Option A - Streamlit secrets (recommended):**
 
 Copy the example file and fill in your values:
+
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+```
+
+Edit `.streamlit/secrets.toml`:
+```toml
+ADMIN_PASSWORD = "your_secure_password_here"
+OPENAI_API_KEY = "sk-your-openai-api-key-here"
+```
+
+**Option B - Environment variables:**
 
 ```bash
 cp .env.example .env
@@ -138,6 +198,7 @@ ADMIN_PASSWORD=your_secure_password_here
 OPENAI_API_KEY=sk-your-openai-api-key-here
 ```
 
+**Keys:**
 - `ADMIN_PASSWORD`: Required for admin login in the app
 - `OPENAI_API_KEY`: Required for AI-assisted Excel import (optional feature)
 
@@ -190,7 +251,7 @@ The project includes a `.devcontainer` configuration. Opening in VS Code with th
 
 ## Importing Data
 
-There are two ways to import provider data:
+There are three ways to import provider data:
 
 ### Method 1: Admin UI (AI-Assisted)
 
@@ -243,15 +304,109 @@ For bulk imports with precise control:
 | crypto_range | Cell range for crypto currencies (optional) |
 | notes | Optional notes |
 
+### Method 3: Google Sheets Sync (Recommended)
+
+Automatically sync from a Google Drive folder containing provider sheets.
+
+#### Setup Google Service Account
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (e.g., `game-providers-app`)
+3. Enable **Google Drive API** and **Google Sheets API**
+4. Go to **Credentials** → **Create Credentials** → **Service Account**
+5. Download the JSON key and save as `service_account.json` in project root
+6. Share your Google Drive folder with the service account email
+
+#### Configure
+
+Add to `.streamlit/secrets.toml`:
+```toml
+GOOGLE_DRIVE_FOLDER_ID = "your_folder_id_here"
+```
+
+Get folder ID from URL: `https://drive.google.com/drive/folders/ABC123...` → `ABC123...`
+
+#### Safe Sync Workflow
+
+The sync uses a **staging database** first - it never directly modifies your main database.
+
+```bash
+# Step 1: Sync from Google Sheets to STAGING database
+python google_sync.py
+
+# Step 2: Preview what was imported
+python google_sync.py --preview
+
+# Step 3: Compare staging vs main (see what changed)
+python google_sync.py --compare
+
+# Step 4: When happy, promote staging to main
+python google_sync.py --promote
+```
+
+#### How It Works
+
+```
+Google Sheets  ──sync──►  db/staging.sqlite  ──promote──►  db/database.sqlite
+                              (safe)                           (main)
+                                │                                  │
+                                └── preview/compare ───────────────┘
+```
+
+- `--preview`: Shows all providers in staging with counts
+- `--compare`: Shows new/removed/changed providers vs main
+- `--promote`: Backs up main DB, then copies staging to main
+
+#### Backup Management
+
+```bash
+# List all backups
+python google_sync.py --list
+
+# Restore main DB from latest backup
+python google_sync.py --restore
+
+# Restore from specific backup
+python google_sync.py --restore database_backup_20240115_143022.sqlite
+```
+
+Features:
+- **Staging database** - sync never touches main DB directly
+- **Automatic backups** - created before every promote
+- **Duplicate detection** - skips unchanged providers
+- **Data deduplication** - removes duplicate codes
+- **10 backups retained** - older backups auto-deleted
+
+#### Expected Folder Structure
+
+```
+Google Drive: "Providers Data"
+├── DreamTech LGD/
+│   └── DreamTech LGD Main DATA (Google Sheet)
+├── Mascot Gaming/
+│   └── Mascot Gaming Main DATA (Google Sheet)
+└── ...
+```
+
+Each sheet should have tabs like:
+- **Restricted countries** - with sections:
+  - "Blocked Countries" → fully blocked
+  - "Restricted Countries" → conditional (can open with docs)
+  - "Regulated Countries" → requires license
+- **Supported currencies** - with sections:
+  - FIAT currencies (e.g., USD, EUR, GBP)
+  - Crypto currencies (e.g., BTC, ETH, USDT)
+
 ---
 
 ## Admin Features
 
 ### Login
 
-Enter credentials in the sidebar:
-- Username: (any value)
-- Password: Value from `ADMIN_PASSWORD` environment variable
+The app has a dedicated login page. Enter your password to access the dashboard:
+- Password: Value from `ADMIN_PASSWORD` environment variable or Streamlit secrets
+
+**Persistent Session**: Check "Keep me signed in" to stay logged in across page refreshes. This stores a secure session token in the URL query parameters.
 
 ### AI Import
 
@@ -268,15 +423,20 @@ The admin panel includes an AI-assisted importer that:
 
 ### Streamlit Theme
 
-Edit `.streamlit/config.toml`:
+The app includes a built-in theme toggle (☀️/🌙 button) that switches between light and dark modes. The preference is stored in the URL query parameters and persists across sessions.
+
+Base theme in `.streamlit/config.toml`:
 ```toml
 [theme]
 base="dark"
-primaryColor="#7C5CFF"
-backgroundColor="#0B1020"
-secondaryBackgroundColor="#111A33"
-textColor="#EAF0FF"
+primaryColor="#3B82F6"
+backgroundColor="#0F172A"
+secondaryBackgroundColor="#1E293B"
+textColor="#F1F5F9"
+font="sans serif"
 ```
+
+Note: The app's custom CSS handles theming dynamically, so the config.toml serves as a fallback.
 
 ### Currency Mode Logic
 
@@ -291,6 +451,7 @@ textColor="#EAF0FF"
 |--------|---------|-------|
 | `app.py` | Main Streamlit application | `streamlit run app.py` |
 | `db_init.py` | Create database schema | `python db_init.py` |
+| `google_sync.py` | Sync from Google Sheets | `python google_sync.py` / `--list` / `--restore` |
 | `importer.py` | Batch import from config.csv | `python importer.py` |
 | `create_countries.py` | Add basic country list | `python create_countries.py` |
 | `create_full_countries.py` | Add full ISO country list | `python create_full_countries.py` |
@@ -320,6 +481,8 @@ Use `python inspect_xlsx.py` to see the Excel structure and verify sheet names m
 - **streamlit**: Web UI framework
 - **pandas**: Data manipulation and Excel reading
 - **openai**: AI-assisted import (optional)
+- **google-api-python-client**: Google Drive and Sheets API
+- **google-auth**: Google authentication
 - **pycountry**: Full ISO country list (optional, for create_full_countries.py)
 
 ---
