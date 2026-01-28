@@ -4,6 +4,7 @@ import json
 import re
 import sqlite3
 import hashlib
+import base64
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +12,33 @@ import streamlit as st
 from openai import OpenAI
 
 DB_PATH = Path("db") / "database.sqlite"
+
+# =================================================
+# Auth helpers (defined early for session restoration)
+# =================================================
+def get_admin_password():
+    if "ADMIN_PASSWORD" in st.secrets:
+        return str(st.secrets["ADMIN_PASSWORD"])
+    return os.getenv("ADMIN_PASSWORD", "")
+
+def get_session_secret():
+    """Get or generate a secret for session tokens."""
+    return hashlib.sha256(f"session_salt_{get_admin_password()}".encode()).hexdigest()[:32]
+
+def generate_session_token():
+    """Generate a session token for persistent login."""
+    secret = get_session_secret()
+    return hashlib.sha256(f"auth_{secret}".encode()).hexdigest()[:24]
+
+def verify_session_token(token: str) -> bool:
+    """Verify if a session token is valid."""
+    if not token:
+        return False
+    expected = generate_session_token()
+    return token == expected
+
+def is_admin():
+    return bool(st.session_state.get("is_admin", False))
 
 # =================================================
 # Theme configuration
@@ -28,7 +56,11 @@ def get_theme():
 def set_theme(theme: str):
     """Set theme in both session state and query params."""
     st.session_state["theme"] = theme
+    # Preserve session token when changing theme
+    session = st.query_params.get("session", "")
     st.query_params["theme"] = theme
+    if session:
+        st.query_params["session"] = session
 
 # Theme color palettes - based on Figma design
 THEMES = {
@@ -129,6 +161,15 @@ THEMES = {
 # =================================================
 st.set_page_config(page_title="Game Providers", layout="wide", initial_sidebar_state="collapsed")
 
+# =================================================
+# Early session restoration (before any rendering)
+# =================================================
+# Check for session token in URL and restore session BEFORE any rendering
+if not is_admin():
+    _session_token = st.query_params.get("session", "")
+    if _session_token and verify_session_token(_session_token):
+        st.session_state["is_admin"] = True
+
 # Get current theme
 current_theme = get_theme()
 t = THEMES[current_theme]
@@ -153,17 +194,16 @@ st.markdown(
         padding: 0.5rem 0;
       }}
       .logo-icon {{
-        width: 44px;
-        height: 44px;
-        background: linear-gradient(135deg, {t["primary"]} 0%, #1E40AF 100%);
-        border-radius: 12px;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
-        font-weight: 600;
-        font-size: 1.1rem;
-        box-shadow: 0 4px 12px {t["primary"]}40;
+      }}
+      .logo-icon img {{
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }}
       .logo-text {{
         font-size: 1.25rem;
@@ -498,30 +538,39 @@ st.markdown(
       }}
 
       /* Button styling - Figma style */
-      .stButton > button {{
-        border-radius: 10px !important;
+      .stButton > button,
+      .stButton button,
+      button[data-testid="stBaseButton-secondary"],
+      button[data-testid="stBaseButton-minimal"],
+      button[kind="secondary"] {{
+        border-radius: 6px !important;
         font-weight: 500 !important;
+        font-size: 0.8rem !important;
         transition: all 0.2s !important;
+        background: {t["bg_card"]} !important;
+        color: {t["text_primary"]} !important;
+        border: 1px solid {t["border"]} !important;
+        padding: 0.35rem 0.75rem !important;
+        min-height: unset !important;
+        line-height: 1.4 !important;
       }}
-      .stButton > button:hover {{
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px {t["shadow"]};
+      .stButton > button:hover,
+      .stButton button:hover,
+      button[data-testid="stBaseButton-secondary"]:hover,
+      button[data-testid="stBaseButton-minimal"]:hover,
+      button[kind="secondary"]:hover {{
+        box-shadow: 0 2px 8px {t["shadow"]};
+        background: {t["bg_hover"]} !important;
+        border-color: {t["primary"]} !important;
+        color: {t["text_primary"]} !important;
       }}
       /* Primary button (active toggle) */
-      .stButton > button[data-testid="stBaseButton-primary"] {{
+      .stButton > button[data-testid="stBaseButton-primary"],
+      button[data-testid="stBaseButton-primary"],
+      button[kind="primary"] {{
         background: {t["primary"]} !important;
         color: {t["primary_foreground"]} !important;
         border: none !important;
-      }}
-      /* Secondary button (inactive toggle) */
-      .stButton > button[data-testid="stBaseButton-secondary"] {{
-        background: {t["bg_secondary"]} !important;
-        color: {t["text_secondary"]} !important;
-        border: 1px solid {t["border"]} !important;
-      }}
-      .stButton > button[data-testid="stBaseButton-secondary"]:hover {{
-        background: {t["bg_hover"]} !important;
-        color: {t["text_primary"]} !important;
       }}
 
       /* Download button - Figma style */
@@ -544,40 +593,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# =================================================
-# Auth
-# =================================================
-def get_admin_password():
-    if "ADMIN_PASSWORD" in st.secrets:
-        return str(st.secrets["ADMIN_PASSWORD"])
-    return os.getenv("ADMIN_PASSWORD", "")
-
-
-def is_admin():
-    return bool(st.session_state.get("is_admin", False))
-
-
-# Session token for persistent login
-def get_session_secret():
-    """Get or generate a secret for session tokens."""
-    # Use admin password + a salt as the secret
-    return hashlib.sha256(f"session_salt_{get_admin_password()}".encode()).hexdigest()[:32]
-
-
-def generate_session_token():
-    """Generate a session token for persistent login."""
-    secret = get_session_secret()
-    return hashlib.sha256(f"auth_{secret}".encode()).hexdigest()[:24]
-
-
-def verify_session_token(token: str) -> bool:
-    """Verify if a session token is valid."""
-    if not token:
-        return False
-    expected = generate_session_token()
-    return token == expected
-
 
 # =================================================
 # DB helpers
@@ -1000,16 +1015,10 @@ def show_login_page():
         .login-logo {{
             width: 72px;
             height: 72px;
-            background: linear-gradient(135deg, {t["primary"]} 0%, #1E40AF 100%);
-            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 1.75rem;
             margin: 0 auto 1.25rem auto;
-            box-shadow: 0 8px 24px {t["primary"]}40;
         }}
         .login-title {{
             font-size: 1.75rem;
@@ -1018,8 +1027,9 @@ def show_login_page():
             margin-bottom: 0.5rem;
         }}
         .login-subtitle {{
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             color: {t["text_secondary"]};
+            letter-spacing: 0.1em;
         }}
 
         /* Form styling */
@@ -1123,6 +1133,19 @@ def show_login_page():
             border-radius: 10px !important;
         }}
 
+        /* Theme toggle button on login page */
+        .stButton > button,
+        .stButton button {{
+            background: {t["bg_card"]} !important;
+            color: {t["text_primary"]} !important;
+            border: 1px solid {t["border"]} !important;
+            border-radius: 10px !important;
+        }}
+        .stButton > button:hover,
+        .stButton button:hover {{
+            background: {t["bg_hover"]} !important;
+        }}
+
         /* Error message */
         [data-testid="stAlert"] {{
             background: {t["tag_blocked_bg"]} !important;
@@ -1154,28 +1177,38 @@ def show_login_page():
     """, unsafe_allow_html=True)
 
     # Theme toggle in top right
-    _, theme_col = st.columns([9, 1])
+    _, theme_col = st.columns([12, 1])
     with theme_col:
-        current = get_theme()
-        icon = "☀️" if current == "dark" else "🌙"
-
         def toggle_login_theme():
             new_theme = "light" if get_theme() == "dark" else "dark"
             set_theme(new_theme)
-
-        st.button(icon, key="login_theme", help="Toggle light/dark theme", on_click=toggle_login_theme)
+        login_current = get_theme()
+        login_icon = "☀" if login_current == "dark" else "☾"
+        st.button(login_icon, key="login_theme", help="Toggle theme", on_click=toggle_login_theme)
 
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        st.markdown("""
-        <div class="login-header">
-            <div class="login-logo">TT</div>
-            <div class="login-title">Game Providers</div>
-            <div class="login-subtitle">Browse providers by country and currency</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Load logo for login page (dark logo for light mode, light logo for dark mode)
+        login_theme = get_theme()
+        login_logo_filename = "ttLogoDark.png" if login_theme == "light" else "ttLogo.png"
+        login_logo_path = Path("assets") / login_logo_filename
+        if login_logo_path.exists():
+            with open(login_logo_path, "rb") as f:
+                login_logo_b64 = base64.b64encode(f.read()).decode()
+            st.markdown(f"""
+            <div class="login-header">
+                <img src="data:image/png;base64,{login_logo_b64}" alt="Timeless Tech" style="height: 80px; margin-bottom: 1.5rem;">
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="login-header">
+                <div class="login-title">TIMELESS TECH™</div>
+                <div class="login-subtitle">iGAMING PLATFORM</div>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown('<div class="login-form-title">Sign In</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-form-desc">Enter your credentials to access the dashboard</div>', unsafe_allow_html=True)
@@ -1191,7 +1224,10 @@ def show_login_page():
                     st.session_state["remember_me"] = remember_me
                     # Set persistent session token if "Keep me signed in" is checked
                     if remember_me:
-                        st.query_params["session"] = generate_session_token()
+                        token = generate_session_token()
+                        st.query_params["session"] = token
+                        # Also preserve theme
+                        st.query_params["theme"] = get_theme()
                     st.rerun()
                 else:
                     st.error("Invalid password. Please try again.")
@@ -1204,14 +1240,10 @@ if not DB_PATH.exists():
     st.error("Database not found. Make sure db/database.sqlite exists.")
     st.stop()
 
-# Check for persistent session token in query params
+# Show login page if not authenticated (session already restored early if token was valid)
 if not is_admin():
-    session_token = st.query_params.get("session", "")
-    if session_token and verify_session_token(session_token):
-        st.session_state["is_admin"] = True
-    else:
-        show_login_page()
-        st.stop()
+    show_login_page()
+    st.stop()
 
 # =================================================
 # Dashboard (only shown after login)
@@ -1224,42 +1256,70 @@ allowed_iso3 = countries_df["iso3"].dropna().tolist()
 fiat = load_fiat_currencies()
 crypto = load_crypto_currencies()
 
-# Sanitize stale session state
+# Sanitize stale session state (reset to defaults if value no longer valid)
 valid_currencies = ["All Currencies"] + fiat
-if st.session_state.get("f_currency", "") and st.session_state["f_currency"] not in valid_currencies:
-    st.session_state["f_currency"] = ""
-if st.session_state.get("f_country", "") and st.session_state["f_country"] not in ["All Countries"] + country_labels:
-    st.session_state["f_country"] = ""
+valid_crypto = ["All Crypto Currencies"] + crypto
+valid_countries = ["All Countries"] + country_labels
+if st.session_state.get("f_currency") and st.session_state["f_currency"] not in valid_currencies:
+    st.session_state["f_currency"] = "All Currencies"
+if st.session_state.get("f_country") and st.session_state["f_country"] not in valid_countries:
+    st.session_state["f_country"] = "All Countries"
+if st.session_state.get("f_crypto") and st.session_state["f_crypto"] not in valid_crypto:
+    st.session_state["f_crypto"] = "All Crypto Currencies"
 
 # =================================================
-# Header row - logo and buttons on same line
-logo_col, spacer_col, theme_col, logout_col = st.columns([3, 4, 1, 2])
+# Header row - logo on left, buttons floated right
+# =================================================
+
+# Load logo image based on theme (dark logo for light mode, light logo for dark mode)
+logo_filename = "ttLogoDark.png" if current_theme == "light" else "ttLogo.png"
+logo_path = Path("assets") / logo_filename
+if logo_path.exists():
+    with open(logo_path, "rb") as f:
+        logo_b64 = base64.b64encode(f.read()).decode()
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="Timeless Tech" style="height: 44px;">'
+else:
+    logo_html = f'''<div style="display:flex;flex-direction:column;">
+        <div style="font-size:1.25rem;font-weight:600;color:{t["text_primary"]};">TIMELESS TECH™</div>
+        <div style="font-size:0.7rem;color:{t["text_secondary"]};letter-spacing:0.1em;">iGAMING PLATFORM</div>
+    </div>'''
+
+# Add CSS to push header buttons to the right
+st.markdown(f'''
+<style>
+    /* Header row - push buttons to right */
+    .header-row-container > [data-testid="stHorizontalBlock"] {{
+        justify-content: space-between !important;
+        align-items: center !important;
+    }}
+    .header-row-container > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {{
+        flex-grow: 0 !important;
+    }}
+    /* Remove flex calc from header button columns */
+    .st-emotion-cache-q1blxj {{
+        flex: none !important;
+        width: auto !important;
+    }}
+</style>
+''', unsafe_allow_html=True)
+
+# Header with columns - logo left, spacer grows to push buttons right
+logo_col, spacer, theme_col, logout_col = st.columns([2, 12, 0.5, 1])
 
 with logo_col:
-    st.markdown("""
-    <div class="logo-container">
-        <div class="logo-icon">TT</div>
-        <div>
-            <div class="logo-text">TIMELESS TECH</div>
-            <div class="logo-subtitle">iGaming Platform</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(logo_html, unsafe_allow_html=True)
 
 with theme_col:
-    current = get_theme()
-    icon = "☀️" if current == "dark" else "🌙"
-
     def toggle_theme():
         new_theme = "light" if get_theme() == "dark" else "dark"
         set_theme(new_theme)
-
-    st.button(icon, key="btn_theme", help="Toggle light/dark theme", on_click=toggle_theme)
+    # Moon icon for current dark mode, sun for light mode
+    theme_icon = "☀" if current_theme == "dark" else "☾"
+    st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
 
 with logout_col:
-    if st.button("Logout", key="btn_logout"):
+    if st.button("→ Logout", key="btn_logout"):
         st.session_state["is_admin"] = False
-        # Clear persistent session token
         if "session" in st.query_params:
             del st.query_params["session"]
         st.rerun()
@@ -1270,11 +1330,24 @@ st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom:
 # =================================================
 # Filters
 # =================================================
-# Initialize filter mode in session state
+# Initialize all filter defaults BEFORE widgets (proper Streamlit pattern)
 if "f_mode" not in st.session_state:
     st.session_state["f_mode"] = "Supported"
+if "f_search" not in st.session_state:
+    st.session_state["f_search"] = ""
+if "f_country" not in st.session_state:
+    st.session_state["f_country"] = "All Countries"
+if "f_currency" not in st.session_state:
+    st.session_state["f_currency"] = "All Currencies"
+if "f_crypto" not in st.session_state:
+    st.session_state["f_crypto"] = "All Crypto Currencies"
 
 filter_mode = st.session_state["f_mode"]
+
+# Build option lists
+country_options = ["All Countries"] + country_labels
+currency_options = ["All Currencies"] + fiat
+crypto_options = ["All Crypto Currencies"] + crypto
 
 # Filter section with card styling
 with st.container(border=True):
@@ -1295,22 +1368,12 @@ with st.container(border=True):
         search = st.text_input("Search Provider", placeholder="Search by name...", key="f_search", label_visibility="visible")
 
     with f2:
-        country_options = ["All Countries"] + country_labels
-        country_idx = 0
-        current_country = st.session_state.get("f_country", "All Countries")
-        if current_country in country_options:
-            country_idx = country_options.index(current_country)
-        country_label = st.selectbox("🌐 Country", country_options, index=country_idx, key="f_country")
+        country_label = st.selectbox("🌐 Country", country_options, key="f_country")
 
     with f3:
-        currency_options = ["All Currencies"] + fiat
-        currency_idx = 0
-        current_currency = st.session_state.get("f_currency", "All Currencies")
-        if current_currency in currency_options:
-            currency_idx = currency_options.index(current_currency)
-        currency = st.selectbox("💱 Currency", currency_options, index=currency_idx, key="f_currency")
+        currency = st.selectbox("💱 Currency", currency_options, key="f_currency")
 
-    # Row 2: Toggle buttons under Country
+    # Row 2: Toggle buttons centered
     g1, g2, g3 = st.columns([2, 2, 2])
     with g2:
         btn1, btn2 = st.columns([1, 1])
@@ -1325,15 +1388,10 @@ with st.container(border=True):
                 st.session_state["f_mode"] = "Restricted"
                 st.rerun()
 
-    # Row 3: Crypto
+    # Row 3: Crypto dropdown
     h1, h2, h3 = st.columns([2, 2, 2])
     with h1:
-        crypto_options = ["All Crypto Currencies"] + crypto
-        crypto_idx = 0
-        current_crypto = st.session_state.get("f_crypto", "All Crypto Currencies")
-        if current_crypto in crypto_options:
-            crypto_idx = crypto_options.index(current_crypto)
-        crypto_filter = st.selectbox("💎 Crypto Currency", crypto_options, index=crypto_idx, key="f_crypto")
+        crypto_filter = st.selectbox("💎 Crypto Currency", crypto_options, key="f_crypto")
 
 # =================================================
 # Query building

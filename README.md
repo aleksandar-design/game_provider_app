@@ -5,6 +5,7 @@ A Streamlit web application for managing game provider data, including country r
 ## Table of Contents
 
 - [Features](#features)
+- [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Database Schema](#database-schema)
 - [Setup](#setup)
@@ -30,6 +31,23 @@ A Streamlit web application for managing game provider data, including country r
 - **Database Backups**: Automatic backups before each sync
 - **Persistent Login**: "Keep me signed in" option to stay logged in across page refreshes
 - **Light/Dark Theme**: Toggle between light and dark modes (preference persists in URL)
+
+---
+
+## Tech Stack
+
+| Category | Technology | Version/Details |
+|----------|------------|-----------------|
+| **Language** | Python | 3.11+ |
+| **Web Framework** | Streamlit | Web UI framework for data apps |
+| **Database** | SQLite | Lightweight, file-based relational database |
+| **Data Processing** | Pandas | Data manipulation and analysis |
+| **Excel Handling** | openpyxl | Read/write Excel files (.xlsx) |
+| **AI Integration** | OpenAI API | gpt-4o-mini for AI-assisted imports |
+| **Google Services** | Google Drive API | Folder/file access for sync |
+| | Google Sheets API | Spreadsheet data extraction |
+| | google-auth | Service account authentication |
+| **Country Data** | pycountry | ISO 3166 country codes (optional) |
 
 ---
 

@@ -570,14 +570,13 @@ def process_spreadsheet_data(drive_service, sheets_service, sheet_id: str, sheet
                 currency_mode = "ALL_FIAT"
                 print(f"   💰 Currencies: ALL FIAT (default), {len(currencies['CRYPTO'])} crypto")
 
-            # Parse games from Excel (first sheet)
+            # Parse games from Excel (all sheets with "Game title" column)
             games = parsed.get("games", [])
-            first_sheet = parsed.get("sheet_names", [""])[0] if parsed.get("sheet_names") else ""
             if games:
                 game_types = get_unique_game_types(games)
-                print(f"   🎮 First tab '{first_sheet}': {len(games)} games, {len(game_types)} types")
+                print(f"   🎮 Found {len(games)} games, {len(game_types)} types")
             else:
-                print(f"   🎮 First tab '{first_sheet}': no game headers found")
+                print(f"   🎮 No game sheets found (no 'Game title' column)")
 
             return restrictions, currencies, currency_mode, games
 
@@ -619,22 +618,27 @@ def process_spreadsheet_data(drive_service, sheets_service, sheet_id: str, sheet
         else:
             print(f"   💰 Currencies: ALL FIAT (no data found)", flush=True)
 
-    # Games are always in the first sheet - check if it has game headers
+    # Check ALL tabs for "Game title" column
     games = []
-    if tab_names:
-        first_tab = tab_names[0]
-        print(f"   🎮 Checking first tab: {first_tab}", flush=True)
+    for tab_name in tab_names:
+        # Skip known non-game tabs
+        tab_lower = tab_name.lower()
+        if any(x in tab_lower for x in ["restrict", "currenc", "country", "config", "setting"]):
+            continue
+
         try:
-            rows = read_sheet_range(sheets_service, sheet_id, first_tab, "A1:Z5000")
+            rows = read_sheet_range(sheets_service, sheet_id, tab_name, "A1:Z5000")
             if rows and has_game_headers(rows):
-                games = parse_games_from_range(rows)
-                if games:
-                    game_types = get_unique_game_types(games)
-                    print(f"   🎮 Found {len(games)} games, {len(game_types)} types")
-            else:
-                print(f"   🎮 First tab has no game headers, skipping")
+                tab_games = parse_games_from_range(rows)
+                if tab_games:
+                    print(f"   🎮 {tab_name}: {len(tab_games)} games")
+                    games.extend(tab_games)
         except Exception as e:
-            print(f"   ❌ Error reading first tab: {e}")
+            print(f"   ❌ Error reading {tab_name}: {e}")
+
+    if games:
+        game_types = get_unique_game_types(games)
+        print(f"   🎮 Total: {len(games)} games, {len(game_types)} types")
 
     return restrictions, currencies, currency_mode, games
 
@@ -692,18 +696,24 @@ def parse_excel_file(file_bytes: bytes) -> dict:
                 rows.append(row_data)
             currencies, all_fiat = parse_currencies_from_range(rows)
 
-    # Games are always in the first sheet - check if it has game headers
+    # Check ALL sheets for "Game title" column
     games = []
-    if sheet_names:
-        first_sheet = sheet_names[0]
-        df = pd.read_excel(xlsx, sheet_name=first_sheet, header=None)
+    for sheet_name in sheet_names:
+        # Skip known non-game sheets
+        sheet_lower = sheet_name.lower()
+        if any(x in sheet_lower for x in ["restrict", "currenc", "country", "config", "setting"]):
+            continue
+
+        df = pd.read_excel(xlsx, sheet_name=sheet_name, header=None)
         if not df.empty:
             rows = []
             for _, row in df.iterrows():
                 row_data = [str(cell) if pd.notna(cell) else "" for cell in row]
                 rows.append(row_data)
             if has_game_headers(rows):
-                games = parse_games_from_range(rows)
+                sheet_games = parse_games_from_range(rows)
+                if sheet_games:
+                    games.extend(sheet_games)
 
     return {
         "sheet_names": sheet_names,
@@ -1254,17 +1264,21 @@ def parse_games_from_range(rows: list[list[str]]) -> list[dict]:
             header_row_idx = row_idx
             break
 
-    # Default column positions if headers not found (based on screenshot)
-    if col_map["wallet_game_id"] < 0:
-        col_map["wallet_game_id"] = 0
-    if col_map["game_title"] < 0:
-        col_map["game_title"] = 1
-    if col_map["game_provider"] < 0:
-        col_map["game_provider"] = 2
-    if col_map["vendor"] < 0:
-        col_map["vendor"] = 3
-    if col_map["game_type"] < 0:
-        col_map["game_type"] = 4
+    # Only apply defaults if NO headers were found at all
+    # (otherwise detected columns are correct, missing ones stay -1)
+    headers_found = col_map["game_title"] >= 0 or col_map["game_type"] >= 0
+    if not headers_found:
+        # Fallback to positional defaults only when no headers detected
+        if col_map["wallet_game_id"] < 0:
+            col_map["wallet_game_id"] = 0
+        if col_map["game_title"] < 0:
+            col_map["game_title"] = 1
+        if col_map["game_provider"] < 0:
+            col_map["game_provider"] = 2
+        if col_map["vendor"] < 0:
+            col_map["vendor"] = 3
+        if col_map["game_type"] < 0:
+            col_map["game_type"] = 4
 
     # Parse data rows (skip header)
     for row in rows[header_row_idx + 1:]:
@@ -1612,6 +1626,13 @@ def sync_all():
             stats["failed"] += 1
 
     con.commit()
+
+    # Get total games count
+    try:
+        total_games = con.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+    except Exception:
+        total_games = 0
+
     con.close()
 
     print(f"\n{'='*50}")
@@ -1620,6 +1641,7 @@ def sync_all():
     print(f"   🔄 Updated: {stats['updated']}")
     print(f"   ⏭️ Unchanged: {stats['unchanged']}")
     print(f"   ❌ Failed: {stats['failed']}")
+    print(f"   🎮 Total games: {total_games}")
     print(f"\n📍 Data saved to: {STAGING_DB_PATH}")
     print(f"\n👉 Next steps:")
     print(f"   1. Preview:  python google_sync.py --preview")
