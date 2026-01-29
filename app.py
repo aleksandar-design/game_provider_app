@@ -378,6 +378,41 @@ st.markdown(
         flex-wrap: wrap;
         padding: 0.5rem 0;
       }}
+      .active-filters-row {{
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        flex-wrap: wrap !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: fit-content !important;
+      }}
+      /* Make the active-filters columns shrink-to-fit */
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) {{
+        align-items: center !important;
+        gap: 0.5rem !important;
+      }}
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div[data-testid="column"],
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div.stColumn {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }}
+      /* Tighten the badges column specifically */
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div.stColumn:has(.filter-badges-container),
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div[data-testid="column"]:has(.filter-badges-container) {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        max-width: 100% !important;
+      }}
+      /* Tighten the clear-all column specifically */
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div.stColumn:has(.stButton button[key="btn_clear_all"]),
+      div[data-testid="stHorizontalBlock"]:has(.active-filters-row) > div[data-testid="column"]:has(.stButton button[key="btn_clear_all"]) {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        max-width: 100% !important;
+      }}
       .filter-badge {{
         display: inline-flex;
         align-items: center;
@@ -409,30 +444,32 @@ st.markdown(
         vertical-align: middle !important;
       }}
 
-      /* Make the parent of badges container inline */
+      /* Inline row for badges + clear button */
       div:has(> .filter-badges-container) {{
-        display: inline-block !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
         margin: 0 !important;
         padding: 0 !important;
+        vertical-align: middle !important;
       }}
-
-      /* Position clear button inline - targets the button's container div */
-      div:has(> .filter-badges-container) + div {{
-        display: inline-block !important;
+      div:has(.stButton button[key="btn_clear_all"]) {{
+        display: inline-flex !important;
+        align-items: center !important;
         margin: 0 !important;
-        margin-left: 0.5rem !important;
         padding: 0 !important;
         vertical-align: middle !important;
       }}
 
-      /* Clear all button styling - transparent ghost style */
+      /* Clear all button styling - inline text style next to badges */
       button[key="btn_clear_all"] {{
         background: transparent !important;
         border: none !important;
         outline: none !important;
         box-shadow: none !important;
         color: {t["text_secondary"]} !important;
-        padding: 0.125rem 0.5rem !important;
+        padding: 0 !important;
         margin: 0 !important;
         font-size: 0.75rem !important;
         font-weight: 400 !important;
@@ -687,6 +724,32 @@ st.markdown(
         box-shadow: 0 4px 12px {t["primary"]}40;
       }}
 
+      /* Clear all button overrides (beat generic button styling) */
+      .stButton > button[key="btn_clear_all"] {{
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        color: {t["text_secondary"]} !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 0.75rem !important;
+        font-weight: 400 !important;
+        min-height: 1.5rem !important;
+        height: 1.5rem !important;
+        line-height: 1.5 !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+      }}
+      .stButton > button[key="btn_clear_all"]:hover {{
+        color: {t["text_primary"]} !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        text-decoration: underline !important;
+        transform: none !important;
+      }}
+
       /* Hide sidebar toggle */
       button[data-testid="baseButton-headerNoPadding"] {{ display: none; }}
     </style>
@@ -714,7 +777,10 @@ def load_countries():
         df = qdf("SELECT iso3, iso2, name FROM countries ORDER BY name")
         if df.empty:
             return pd.DataFrame(columns=["iso3", "iso2", "name", "label"])
-        df["label"] = df["name"] + " (" + df["iso3"] + ")"
+
+        # label like: "us United States (USA)"
+        iso2 = df["iso2"].fillna(df["iso3"].str[:2]).str.lower()
+        df["label"] = iso2 + " " + df["name"] + " (" + df["iso3"] + ")"
         return df
     except Exception:
         return pd.DataFrame(columns=["iso3", "iso2", "name", "label"])
@@ -851,6 +917,15 @@ def get_currency_symbol(code: str) -> str:
         "LTC": "Ł", "TRX": "◈", "MATIC": "◇",
     }
     return symbols.get(code, "")
+
+
+def get_currency_name(code: str) -> str:
+    try:
+        import pycountry
+        cur = pycountry.currencies.get(alpha_3=code)
+        return cur.name if cur else ""
+    except Exception:
+        return ""
 
 
 def upsert_provider_by_name(provider_name: str, currency_mode: str) -> int:
@@ -1360,17 +1435,6 @@ allowed_iso3 = countries_df["iso3"].dropna().tolist()
 fiat = load_fiat_currencies()
 crypto = load_crypto_currencies()
 
-# Sanitize stale session state (reset to defaults if value no longer valid)
-valid_currencies = ["All Currencies"] + fiat
-valid_crypto = ["All Crypto Currencies"] + crypto
-valid_countries = ["All Countries"] + country_labels
-if st.session_state.get("f_currency") and st.session_state["f_currency"] not in valid_currencies:
-    st.session_state["f_currency"] = "All Currencies"
-if st.session_state.get("f_country") and st.session_state["f_country"] not in valid_countries:
-    st.session_state["f_country"] = "All Countries"
-if st.session_state.get("f_crypto") and st.session_state["f_crypto"] not in valid_crypto:
-    st.session_state["f_crypto"] = "All Crypto Currencies"
-
 # =================================================
 # Header row - logo on left, buttons floated right
 # =================================================
@@ -1416,40 +1480,63 @@ with logout_col:
 st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
 
 # =================================================
-# Filters
+# Filters (match mock layout)
 # =================================================
-# Check if clear all was clicked (must be before widget initialization)
+
+# Clear all handler (before widgets)
 if st.session_state.get("_clear_all_clicked", False):
     st.session_state["f_mode"] = "Supported"
     st.session_state["f_search"] = ""
     st.session_state["f_country"] = "All Countries"
-    st.session_state["f_currency"] = "All Currencies"
+    st.session_state["f_currency"] = "All Fiat Currencies"
     st.session_state["f_crypto"] = "All Crypto Currencies"
     st.session_state["_clear_all_clicked"] = False
     st.rerun()
 
-# Initialize all filter defaults BEFORE widgets (proper Streamlit pattern)
-if "f_mode" not in st.session_state:
-    st.session_state["f_mode"] = "Supported"
-if "f_search" not in st.session_state:
-    st.session_state["f_search"] = ""
-if "f_country" not in st.session_state:
-    st.session_state["f_country"] = "All Countries"
-if "f_currency" not in st.session_state:
-    st.session_state["f_currency"] = "All Currencies"
-if "f_crypto" not in st.session_state:
-    st.session_state["f_crypto"] = "All Crypto Currencies"
+# Defaults
+st.session_state.setdefault("f_mode", "Supported")
+st.session_state.setdefault("f_search", "")
+st.session_state.setdefault("f_country", "All Countries")
+st.session_state.setdefault("f_currency", "All Fiat Currencies")
+st.session_state.setdefault("f_crypto", "All Crypto Currencies")
 
 filter_mode = st.session_state["f_mode"]
 
 # Build option lists
 country_options = ["All Countries"] + country_labels
-currency_options = ["All Currencies"] + fiat
+
+fiat_codes = fiat
+fiat_options = ["All Fiat Currencies"]
+fiat_label_to_code = {}
+for c in fiat_codes:
+    sym = get_currency_symbol(c)
+    nm = get_currency_name(c)
+    if nm:
+        # Has name: "$ USD - US Dollar"
+        label = f"{sym} {c} - {nm}".strip() if sym else f"{c} - {nm}"
+    else:
+        # No name: just "USD" or "$ USD"
+        label = f"{sym} {c}".strip() if sym else c
+    fiat_options.append(label)
+    fiat_label_to_code[label] = c
+
 crypto_options = ["All Crypto Currencies"] + crypto
 
-# Filter section with card styling
+# Sanitize stale state - rerun if any changes needed
+_needs_rerun = False
+if st.session_state["f_country"] not in country_options:
+    st.session_state["f_country"] = "All Countries"
+    _needs_rerun = True
+if st.session_state["f_currency"] not in fiat_options:
+    st.session_state["f_currency"] = "All Fiat Currencies"
+    _needs_rerun = True
+if st.session_state["f_crypto"] not in crypto_options:
+    st.session_state["f_crypto"] = "All Crypto Currencies"
+    _needs_rerun = True
+if _needs_rerun:
+    st.rerun()
+
 with st.container(border=True):
-    # Filter title with funnel icon
     st.markdown(f'''
     <div class="filter-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{t["primary"]}" stroke-width="2">
@@ -1459,76 +1546,106 @@ with st.container(border=True):
     </div>
     ''', unsafe_allow_html=True)
 
-    # Row 1: Search, Country, Currency
-    f1, f2, f3 = st.columns([2, 2, 2])
+    left, right = st.columns([1, 1], gap="large")
 
-    with f1:
-        search = st.text_input("Search Provider", placeholder="Search by name...", key="f_search", label_visibility="visible")
+    with left:
+        search = st.text_input(
+            "Search Provider",
+            placeholder="Search by name...",
+            key="f_search",
+            label_visibility="visible",
+        )
 
-    with f2:
-        country_label = st.selectbox("🌐 Country", country_options, key="f_country")
+        country_label = st.selectbox(
+            "Country",
+            country_options,
+            key="f_country",
+        )
 
-    with f3:
-        currency = st.selectbox("💱 Currency", currency_options, key="f_currency")
-
-    # Row 2: Toggle buttons centered
-    g1, g2, g3 = st.columns([2, 2, 2])
-    with g2:
-        btn1, btn2 = st.columns([1, 1])
-        with btn1:
+        # Mode row (Supported button + Restricted text/button)
+        m1, m2 = st.columns([1, 1])
+        with m1:
             supported_style = "primary" if filter_mode == "Supported" else "secondary"
             if st.button("Supported", key="btn_supported", type=supported_style, use_container_width=True):
                 st.session_state["f_mode"] = "Supported"
                 st.rerun()
-        with btn2:
+        with m2:
             restricted_style = "primary" if filter_mode == "Restricted" else "secondary"
             if st.button("Restricted", key="btn_restricted", type=restricted_style, use_container_width=True):
                 st.session_state["f_mode"] = "Restricted"
                 st.rerun()
 
-    # Row 3: Crypto dropdown
-    h1, h2, h3 = st.columns([2, 2, 2])
-    with h1:
-        crypto_filter = st.selectbox("💎 Crypto Currency", crypto_options, key="f_crypto")
+    with right:
+        fiat_label = st.selectbox(
+            "Fiat Currency",
+            fiat_options,
+            key="f_currency",
+        )
 
-    # Active filter badges
+        crypto_filter = st.selectbox(
+            "Crypto Currency",
+            crypto_options,
+            key="f_crypto",
+        )
+
+    # Active filter badges + Clear all (same row)
     active_filters = []
+
     if search:
         active_filters.append(("Search", search))
+
     if country_label != "All Countries":
-        active_filters.append(("Country", country_label))
-    if currency != "All Currencies":
-        active_filters.append(("Currency", currency))
+        # show just country name in badge (like mock)
+        # country_label format: "us United States (USA)"
+        badge_country = country_label.split(" ", 1)[1] if " " in country_label else country_label
+        active_filters.append(("Country", badge_country))
+
+    fiat_code = fiat_label_to_code.get(fiat_label, "") if fiat_label != "All Fiat Currencies" else ""
+    if fiat_code:
+        active_filters.append(("Currency", fiat_code))
+
     if crypto_filter != "All Crypto Currencies":
         active_filters.append(("Crypto", crypto_filter))
+
     if filter_mode != "Supported":
         active_filters.append(("Mode", filter_mode))
 
     if active_filters:
-        # Badges HTML
-        badges_html = '<div class="filter-badges-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 0; margin: 0;">'
-        badges_html += f'<span style="color: {t["text_secondary"]}; font-size: 0.85rem; font-weight: 500;">Active filters:</span>'
-
+        badges_html = '<div class="active-filters-row filter-badges-container" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;padding:0.5rem 0;margin:0;">'
+        badges_html += f'<span style="color:{t["text_secondary"]};font-size:0.85rem;font-weight:500;">Active filters:</span>'
         for label, value in active_filters:
-            # Truncate long values
             display_value = value if len(str(value)) <= 30 else str(value)[:27] + "..."
-            # Match Figma: bg-primary/20 with border-transparent
-            bg_color = "rgba(14, 165, 233, 0.2)" if current_theme == "light" else "rgba(30, 58, 138, 1)"
+            bg_color = "rgba(14, 165, 233, 0.15)" if current_theme == "light" else "rgba(30, 58, 138, 1)"
             text_color = "#0369A1" if current_theme == "light" else "#93C5FD"
-            # Badge with transparent border (React: border-transparent) - no visible border
-            badges_html += f'<span style="display: inline-flex; align-items: center; gap: 0.35rem; background: {bg_color}; color: {text_color}; border: 1px solid transparent; outline: none; box-shadow: none; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; line-height: 1.5;"><span style="font-weight: 500;">{label}:</span> <span style="font-weight: 600;">{display_value}</span></span>'
+            badges_html += (
+                f'<span style="display:inline-flex;align-items:center;gap:0.35rem;'
+                f'background:{bg_color};color:{text_color};border:1px solid transparent;'
+                f'padding:0.125rem 0.5rem;border-radius:0.5rem;font-size:0.75rem;font-weight:500;line-height:1.6;">'
+                f'<span style="font-weight:500;">{label}:</span>'
+                f'<span style="font-weight:600;">{display_value}</span>'
+                f'</span>'
+            )
+        badges_html += "</div>"
 
-        badges_html += '</div>'
-        st.markdown(badges_html, unsafe_allow_html=True)
-
-        # Clear button (CSS will position it inline)
-        if st.button("Clear all", key="btn_clear_all", type="secondary"):
-            st.session_state["_clear_all_clicked"] = True
-            st.rerun()
+        af1, af2 = st.columns([1, 1], gap="small")
+        with af1:
+            st.markdown(badges_html, unsafe_allow_html=True)
+        with af2:
+            if st.button("Clear all", key="btn_clear_all", type="secondary"):
+                st.session_state["_clear_all_clicked"] = True
+                st.rerun()
 
 # =================================================
 # Query building
 # =================================================
+# Variables search, country_label, fiat_label, crypto_filter are already defined
+# from the widgets above and are accessible here due to Python scoping
+
+# Convert selected fiat label -> code for SQL
+selected_fiat_code = ""
+if fiat_label != "All Fiat Currencies":
+    selected_fiat_code = fiat_label_to_code.get(fiat_label, "")
+
 where = []
 params = []
 
@@ -1543,7 +1660,8 @@ if country_iso:
             p.provider_id NOT IN (
                 SELECT provider_id
                 FROM restrictions
-                WHERE country_code=? AND restriction_type='RESTRICTED'
+                WHERE country_code=?
+                  AND (restriction_type='RESTRICTED' OR restriction_type IS NULL)
             )
         """)
         params.append(country_iso)
@@ -1552,13 +1670,13 @@ if country_iso:
             p.provider_id IN (
                 SELECT provider_id
                 FROM restrictions
-                WHERE country_code=? AND restriction_type='RESTRICTED'
+                WHERE country_code=?
+                  AND (restriction_type='RESTRICTED' OR restriction_type IS NULL)
             )
         """)
         params.append(country_iso)
 
-if currency and currency != "All Currencies":
-    # Check both new and legacy tables
+if selected_fiat_code:
     where.append(
         """
         (
@@ -1576,7 +1694,7 @@ if currency and currency != "All Currencies":
         )
         """
     )
-    params.extend([currency, currency])
+    params.extend([selected_fiat_code, selected_fiat_code])
 
 if crypto_filter and crypto_filter != "All Crypto Currencies":
     # Check both new and legacy tables
