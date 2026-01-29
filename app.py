@@ -246,6 +246,8 @@ st.markdown(
       /* Filter container - style bordered containers */
       [data-testid="stVerticalBlockBorderWrapper"] {{
         border-radius: 16px !important;
+        border: 1px solid {t["border"]} !important;
+        background: {t["bg_card"]} !important;
         margin-bottom: 1rem !important;
       }}
       /* Vertical gaps inside filter container */
@@ -581,6 +583,12 @@ st.markdown(
         background: {t["input_bg"]} !important;
         color: {t["text_primary"]} !important;
       }}
+      .stSelectbox [data-testid="stSelectbox"] div {{
+        color: {t["text_primary"]} !important;
+      }}
+      .stSelectbox [data-testid="stSelectbox"] span {{
+        color: {t["text_primary"]} !important;
+      }}
       /* Fix dark corners and border on text input wrapper */
       .stTextInput, .stTextInput > div, .stTextInput > div > div {{
         background: transparent !important;
@@ -600,6 +608,11 @@ st.markdown(
       .stTextInput input {{
         background: {t["input_bg"]} !important;
         border: none !important;
+        color: {t["text_primary"]} !important;
+      }}
+      .stTextInput input::placeholder {{
+        color: {t["text_secondary"]} !important;
+        opacity: 1 !important;
       }}
       .stSelectbox > div > div:focus-within, .stTextInput > div > div > input:focus {{
         border-color: {t["primary"]} !important;
@@ -634,6 +647,15 @@ st.markdown(
         background: {t["bg_card"]} !important;
         border: 1px solid {t["border"]} !important;
         border-radius: 10px !important;
+      }}
+      [data-testid="stSelectboxVirtualDropdown"] * {{
+        color: {t["text_primary"]} !important;
+      }}
+      [data-testid="stSelectboxVirtualDropdown"] [role="option"] {{
+        background: transparent !important;
+      }}
+      [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] {{
+        background: {t["bg_hover"]} !important;
       }}
 
       /* Provider card styling - using details element */
@@ -727,19 +749,27 @@ st.markdown(
       /* Clear all button overrides (beat generic button styling) */
       .stButton > button[key="btn_clear_all"] {{
         background: transparent !important;
-        border: none !important;
+        border: 0 !important;
+        border-color: transparent !important;
         outline: none !important;
         box-shadow: none !important;
         color: {t["text_secondary"]} !important;
         padding: 0 !important;
         margin: 0 !important;
         font-size: 0.75rem !important;
-        font-weight: 400 !important;
-        min-height: 1.5rem !important;
-        height: 1.5rem !important;
-        line-height: 1.5 !important;
+        font-weight: 500 !important;
+        min-height: unset !important;
+        height: auto !important;
+        line-height: 1.4 !important;
+        border-radius: 0 !important;
         text-decoration: none !important;
         cursor: pointer !important;
+      }}
+      .stButton > button[key="btn_clear_all"] * {{
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: none !important;
       }}
       .stButton > button[key="btn_clear_all"]:hover {{
         color: {t["text_primary"]} !important;
@@ -748,6 +778,100 @@ st.markdown(
         border: none !important;
         text-decoration: underline !important;
         transform: none !important;
+      }}
+      .stButton > button[key="btn_clear_all"]:focus,
+      .stButton > button[key="btn_clear_all"]:active {{
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        outline: none !important;
+      }}
+      /* Streamlit wraps buttons in stElementContainer with the key */
+      div[data-testid="stElementContainer"][key="btn_clear_all"] {{
+        width: fit-content !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }}
+      div[data-testid="stElementContainer"][key="btn_clear_all"] .stButton {{
+        margin: 0 !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }}
+      div[data-testid="stElementContainer"][key="btn_clear_all"] button,
+      div[data-testid="stElementContainer"][key="btn_clear_all"] button[data-testid="stBaseButton-secondary"] {{
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        color: {t["text_secondary"]} !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        min-height: unset !important;
+        height: auto !important;
+        line-height: 1.4 !important;
+        border-radius: 0 !important;
+      }}
+      div[data-testid="stElementContainer"][key="btn_clear_all"] * {{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        color: inherit !important;
+      }}
+      div[data-testid="stElementContainer"][key="btn_clear_all"] button * {{
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }}
+      div[data-testid="stElementContainer"][key="btn_clear_all"] button:hover,
+      div[data-testid="stElementContainer"][key="btn_clear_all"] button[data-testid="stBaseButton-secondary"]:hover {{
+        color: {t["text_primary"]} !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        text-decoration: underline !important;
+      }}
+
+      /* Clear all (Active filters row) - plain text style */
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        max-width: fit-content !important;
+      }}
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button,
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) button {{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        color: {t["text_secondary"]} !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+      }}
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:hover,
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) button:hover {{
+        color: {t["text_primary"]} !important;
+        text-decoration: none !important;
+      }}
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:focus,
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:focus-visible,
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) button:focus,
+      div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) button:focus-visible {{
+        outline: none !important;
+        box-shadow: none !important;
       }}
 
       /* Hide sidebar toggle */
@@ -1342,6 +1466,7 @@ def show_login_page():
         [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {{
             color: {t["chart_red"]} !important;
         }}
+        
     </style>
 
     <!-- Animated background -->
@@ -1627,7 +1752,7 @@ with st.container(border=True):
             )
         badges_html += "</div>"
 
-        af1, af2 = st.columns([1, 1], gap="small")
+        af1, af2 = st.columns([8, 1], gap="small")
         with af1:
             st.markdown(badges_html, unsafe_allow_html=True)
         with af2:
