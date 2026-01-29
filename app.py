@@ -262,7 +262,7 @@ st.markdown(
         align-items: center;
         gap: 0.5rem;
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 700;
         color: {t["text_primary"]};
         margin-bottom: 0.5rem;
       }}
@@ -326,6 +326,23 @@ st.markdown(
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
+      }}
+      .games-container {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }}
+      .game-chip {{
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.6rem;
+        background: {t["tag_bg"]};
+        border: 1px solid {t["border"]};
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: {t["text_primary"]};
+        line-height: 1.4;
       }}
       .tag {{
         display: inline-block;
@@ -574,14 +591,24 @@ st.markdown(
       /* Streamlit overrides - Figma style */
       .stSelectbox label, .stTextInput label {{
         font-size: 0.875rem;
-        color: {t["text_secondary"]};
-        font-weight: 500;
+        color: {t["text_secondary"]} !important;
+        font-weight: 700 !important;
+      }}
+      [data-testid="stWidgetLabel"] {{
+        color: {t["text_secondary"]} !important;
+      }}
+      [data-testid="stWidgetLabel"] > label,
+      [data-testid="stWidgetLabel"] label,
+      [data-testid="stWidgetLabel"] p {{
+        font-weight: 700 !important;
+        color: {t["text_secondary"]} !important;
       }}
       .stSelectbox > div > div, .stTextInput > div > div > input {{
         border-radius: 10px;
         border: 1px solid {t["border"]} !important;
         background: {t["input_bg"]} !important;
         color: {t["text_primary"]} !important;
+        font-weight: 600 !important;
       }}
       .stSelectbox [data-testid="stSelectbox"] div {{
         color: {t["text_primary"]} !important;
@@ -730,6 +757,31 @@ st.markdown(
         background: {t["primary"]} !important;
         color: {t["primary_foreground"]} !important;
         border: none !important;
+      }}
+      /* Mode toggle buttons: unselected state = no border, hover shows border */
+      button[key="btn_supported"]:not([data-testid="stBaseButton-primary"]),
+      button[key="btn_restricted"]:not([data-testid="stBaseButton-primary"]) {{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        color: {t["text_secondary"]} !important;
+      }}
+      button[key="btn_supported"]:not([data-testid="stBaseButton-primary"]):hover,
+      button[key="btn_restricted"]:not([data-testid="stBaseButton-primary"]):hover {{
+        background: {t["bg_hover"]} !important;
+        border: 1px solid {t["border"]} !important;
+        color: {t["text_primary"]} !important;
+      }}
+      .stButton:has(button[key="btn_supported"]),
+      .stButton:has(button[key="btn_restricted"]) {{
+        box-shadow: none !important;
+      }}
+      button[key="btn_supported"][data-testid="stBaseButton-secondary"]:hover,
+      button[key="btn_restricted"][data-testid="stBaseButton-secondary"]:hover {{
+        background: {t["bg_hover"]} !important;
+        border-color: {t["border"]} !important;
+        color: {t["text_primary"]} !important;
       }}
 
       /* Download button - Figma style */
@@ -1613,16 +1665,6 @@ st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom:
 # Filters (match mock layout)
 # =================================================
 
-# Clear all handler (before widgets)
-if st.session_state.get("_clear_all_clicked", False):
-    st.session_state["f_mode"] = "Supported"
-    st.session_state["f_search"] = ""
-    st.session_state["f_country"] = "All Countries"
-    st.session_state["f_currency"] = "All Fiat Currencies"
-    st.session_state["f_crypto"] = "All Crypto Currencies"
-    st.session_state["_clear_all_clicked"] = False
-    st.rerun()
-
 # Defaults
 st.session_state.setdefault("f_mode", "Supported")
 st.session_state.setdefault("f_search", "")
@@ -1631,6 +1673,14 @@ st.session_state.setdefault("f_currency", "All Fiat Currencies")
 st.session_state.setdefault("f_crypto", "All Crypto Currencies")
 
 filter_mode = st.session_state["f_mode"]
+
+# Clear all handler (runs before widgets via on_click)
+def clear_all_filters():
+    st.session_state["f_mode"] = "Supported"
+    st.session_state["f_search"] = ""
+    st.session_state["f_country"] = "All Countries"
+    st.session_state["f_currency"] = "All Fiat Currencies"
+    st.session_state["f_crypto"] = "All Crypto Currencies"
 
 # Build option lists
 country_options = ["All Countries"] + country_labels
@@ -1688,14 +1738,14 @@ with st.container(border=True):
 
     with left:
         search = st.text_input(
-            "Search Provider",
+            "Search Provider:",
             placeholder="Search by name...",
             key="f_search",
             label_visibility="visible",
         )
 
         country_label = st.selectbox(
-            "Country",
+            "Country:",
             country_options,
             key="f_country",
         )
@@ -1715,13 +1765,13 @@ with st.container(border=True):
 
     with right:
         fiat_label = st.selectbox(
-            "Fiat Currency",
+            "Fiat Currency:",
             fiat_options,
             key="f_currency",
         )
 
         crypto_label = st.selectbox(
-            "Crypto Currency",
+            "Crypto Currency:",
             crypto_options,
             key="f_crypto",
         )
@@ -1774,9 +1824,7 @@ with st.container(border=True):
         with af1:
             st.markdown(badges_html, unsafe_allow_html=True)
         with af2:
-            if st.button("Clear all", key="btn_clear_all", type="secondary"):
-                st.session_state["_clear_all_clicked"] = True
-                st.rerun()
+            st.button("Clear all", key="btn_clear_all", type="secondary", on_click=clear_all_filters)
 
 # =================================================
 # Query building
@@ -1874,9 +1922,19 @@ df = qdf(
 # =================================================
 # Stats cards
 # =================================================
-total_providers = int(qdf("SELECT COUNT(*) c FROM providers")["c"][0])
+total_providers = len(df)
 try:
-    total_games = int(qdf("SELECT COUNT(*) c FROM games")["c"][0])
+    provider_ids = df["ID"].tolist()
+    if provider_ids:
+        placeholders = ",".join(["?"] * len(provider_ids))
+        total_games = int(
+            qdf(
+                f"SELECT COUNT(*) c FROM games WHERE provider_id IN ({placeholders})",
+                tuple(provider_ids),
+            )["c"][0]
+        )
+    else:
+        total_games = 0
 except Exception:
     total_games = 0
 
@@ -1912,7 +1970,7 @@ with pcol3:
     df.to_excel(excel_buffer, index=False, engine='openpyxl')
     excel_buffer.seek(0)
     st.download_button(
-        "📥 Export to Excel",
+        "Export to Excel",
         data=excel_buffer,
         file_name="providers.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1926,6 +1984,146 @@ st.markdown('<div class="provider-cards">', unsafe_allow_html=True)
 if df.empty:
     st.info("No providers match your filters.")
 else:
+    provider_ids = df["ID"].tolist()
+    placeholders = ",".join(["?"] * len(provider_ids))
+
+    # Bulk load provider metadata
+    provider_meta_df = qdf(
+        f"SELECT provider_id, currency_mode FROM providers WHERE provider_id IN ({placeholders})",
+        tuple(provider_ids),
+    )
+    provider_currency_mode = dict(
+        zip(provider_meta_df["provider_id"], provider_meta_df["currency_mode"])
+    )
+
+    # Bulk load restrictions
+    restrictions_df = qdf(
+        f"""
+        SELECT provider_id, country_code, restriction_type
+        FROM restrictions
+        WHERE provider_id IN ({placeholders})
+        """,
+        tuple(provider_ids),
+    )
+    restricted_map = {}
+    regulated_map = {}
+    restrictions_count_map = {}
+    if not restrictions_df.empty:
+        for row in restrictions_df.itertuples(index=False):
+            restrictions_count_map[row.provider_id] = restrictions_count_map.get(row.provider_id, 0) + 1
+            if row.restriction_type == "REGULATED":
+                regulated_map.setdefault(row.provider_id, []).append(row.country_code)
+            else:
+                restricted_map.setdefault(row.provider_id, []).append(row.country_code)
+
+    # Bulk load currencies
+    empty_currencies_df = pd.DataFrame(columns=["currency_code", "currency_type"])
+    try:
+        fiat_df = qdf(
+            f"""
+            SELECT provider_id, currency_code, 'FIAT' as currency_type
+            FROM fiat_currencies
+            WHERE provider_id IN ({placeholders})
+            """,
+            tuple(provider_ids),
+        )
+        crypto_df = qdf(
+            f"""
+            SELECT provider_id, currency_code, 'CRYPTO' as currency_type
+            FROM crypto_currencies
+            WHERE provider_id IN ({placeholders})
+            """,
+            tuple(provider_ids),
+        )
+        currencies_df = pd.concat([fiat_df, crypto_df], ignore_index=True)
+    except Exception:
+        currencies_df = qdf(
+            f"""
+            SELECT provider_id, currency_code, currency_type
+            FROM currencies
+            WHERE provider_id IN ({placeholders})
+            """,
+            tuple(provider_ids),
+        )
+    currencies_grouped = (
+        {pid: grp for pid, grp in currencies_df.groupby("provider_id")}
+        if not currencies_df.empty
+        else {}
+    )
+    currency_count_map = (
+        currencies_df.groupby("provider_id").size().to_dict()
+        if not currencies_df.empty
+        else {}
+    )
+
+    # Bulk load games count
+    try:
+        games_df = qdf(
+            f"""
+            SELECT provider_id, COUNT(*) as games
+            FROM games
+            WHERE provider_id IN ({placeholders})
+            GROUP BY provider_id
+            """,
+            tuple(provider_ids),
+        )
+        games_map = dict(zip(games_df["provider_id"], games_df["games"]))
+    except Exception:
+        games_map = {}
+
+    # Bulk load game types per provider
+    game_types_map = {}
+    try:
+        game_types_df = qdf(
+            f"""
+            SELECT provider_id, LOWER(game_type) as game_type
+            FROM games
+            WHERE provider_id IN ({placeholders})
+            GROUP BY provider_id, LOWER(game_type)
+            """,
+            tuple(provider_ids),
+        )
+        if not game_types_df.empty:
+            for row in game_types_df.itertuples(index=False):
+                game_types_map.setdefault(row.provider_id, []).append(row.game_type or "")
+    except Exception:
+        game_types_map = {}
+
+    def format_game_type(gt: str) -> str:
+        if not gt:
+            return ""
+        normalized = gt.strip().lower()
+        mapping = {
+            "slots": "Slots",
+            "tablegames": "Table Games",
+            "instantgame": "Instant Games",
+            "crashgame": "Crash Games",
+            "scratchcards": "Scratch Cards",
+            "shooting": "Shooting",
+            "roulette": "Roulette",
+            "blackjack": "Blackjack",
+            "baccarat": "Baccarat",
+        }
+        if normalized in mapping:
+            return mapping[normalized]
+        return normalized.replace("_", " ").title()
+
+    # Helper to get country info from ISO3
+    def get_country_info(iso3_list):
+        result = []
+        for iso3 in iso3_list:
+            match = countries_df[countries_df["iso3"] == iso3]
+            if not match.empty:
+                row = match.iloc[0]
+                result.append({
+                    "iso3": iso3,
+                    "iso2": row.get("iso2", iso3[:2]) or iso3[:2],
+                    "name": row["name"]
+                })
+            else:
+                result.append({"iso3": iso3, "iso2": iso3[:2], "name": iso3})
+        return result
+
     # Create two columns for the grid
     col1, col2 = st.columns(2)
 
@@ -1933,106 +2131,75 @@ else:
         pid = row["ID"]
         pname = row["Game Provider"]
 
-        # Get provider stats
-        stats = get_provider_stats(pid)
-        details = get_provider_details(pid)
+        stats = {
+            "restrictions": restrictions_count_map.get(pid, 0),
+            "currencies": currency_count_map.get(pid, 0),
+            "games": int(games_map.get(pid, 0)),
+        }
+        details = {
+            "restricted": restricted_map.get(pid, []),
+            "regulated": regulated_map.get(pid, []),
+            "currencies": currencies_grouped.get(pid, empty_currencies_df),
+            "currency_mode": provider_currency_mode.get(pid, "ALL_FIAT"),
+        }
+        supported_games = sorted(
+            {format_game_type(gt) for gt in game_types_map.get(pid, []) if gt}
+        )
 
         # Alternate between columns
         target_col = col1 if idx % 2 == 0 else col2
 
         with target_col:
-            # Build tags HTML
-            tags_html = ""
-            if details:
-                restricted_count = len(details["restricted"])
-                regulated_count = len(details["regulated"])
-
-                if restricted_count > 0:
-                    tags_html += f'<span class="tag restricted">Restricted: {restricted_count}</span>'
-                if regulated_count > 0:
-                    tags_html += f'<span class="tag regulated">Regulated: {regulated_count}</span>'
-
-                # Currency info
-                if details["provider"].currency_mode == "ALL_FIAT":
-                    tags_html += '<span class="tag fiat">All FIAT</span>'
-                else:
-                    fiat_list = details["currencies"][details["currencies"]["currency_type"] == "FIAT"]["currency_code"].tolist()
-                    if fiat_list:
-                        tags_html += f'<span class="tag fiat">FIAT: {len(fiat_list)}</span>'
-
-                crypto_list = details["currencies"][details["currencies"]["currency_type"] == "CRYPTO"]["currency_code"].tolist()
-                if crypto_list:
-                    tags_html += f'<span class="tag crypto">Crypto: {len(crypto_list)}</span>'
-
             # Build details HTML content
             details_html = ""
-            if details:
-                p = details["provider"]
+            # Restricted Countries
+            if details["restricted"]:
+                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
+                restricted_countries = get_country_info(details["restricted"][:20])
+                details_html += f'<div class="country-tags">'
+                for c in restricted_countries:
+                    details_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                if len(details["restricted"]) > 20:
+                    details_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
+                details_html += '</div>'
 
-                # Helper to get country info from ISO3
-                def get_country_info(iso3_list):
-                    result = []
-                    for iso3 in iso3_list:
-                        match = countries_df[countries_df["iso3"] == iso3]
-                        if not match.empty:
-                            row = match.iloc[0]
-                            result.append({
-                                "iso3": iso3,
-                                "iso2": row.get("iso2", iso3[:2]) or iso3[:2],
-                                "name": row["name"]
-                            })
-                        else:
-                            result.append({"iso3": iso3, "iso2": iso3[:2], "name": iso3})
-                    return result
+            # Regulated Countries
+            if details["regulated"]:
+                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
+                regulated_countries = get_country_info(details["regulated"][:20])
+                details_html += '<div class="country-tags">'
+                for c in regulated_countries:
+                    details_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                if len(details["regulated"]) > 20:
+                    details_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
+                details_html += '</div>'
 
-                # Restricted Countries
-                if details["restricted"]:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
-                    restricted_countries = get_country_info(details["restricted"][:20])
-                    details_html += f'<div class="country-tags">'
-                    for c in restricted_countries:
-                        details_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                    if len(details["restricted"]) > 20:
-                        details_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
-                    details_html += '</div>'
-
-                # Regulated Countries
-                if details["regulated"]:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
-                    regulated_countries = get_country_info(details["regulated"][:20])
-                    details_html += '<div class="country-tags">'
-                    for c in regulated_countries:
-                        details_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                    if len(details["regulated"]) > 20:
-                        details_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
-                    details_html += '</div>'
-
-                # Supported Currencies
-                fiat_list = details["currencies"][details["currencies"]["currency_type"] == "FIAT"]["currency_code"].tolist() if not details["currencies"].empty else []
-                if p.currency_mode == "ALL_FIAT" or fiat_list:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Currencies</div>'
-                    if p.currency_mode == "ALL_FIAT":
-                        details_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
-                    else:
-                        details_html += '<div class="currency-grid">'
-                        for curr in fiat_list[:9]:
-                            symbol = get_currency_symbol(curr)
-                            details_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
-                        details_html += '</div>'
-                        if len(fiat_list) > 9:
-                            details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
-
-                # Supported Crypto
-                crypto_list = details["currencies"][details["currencies"]["currency_type"] == "CRYPTO"]["currency_code"].tolist() if not details["currencies"].empty else []
-                if crypto_list:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Crypto Currencies</div>'
+            # Supported Currencies
+            fiat_list = details["currencies"][details["currencies"]["currency_type"] == "FIAT"]["currency_code"].tolist() if not details["currencies"].empty else []
+            if details["currency_mode"] == "ALL_FIAT" or fiat_list:
+                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Currencies</div>'
+                if details["currency_mode"] == "ALL_FIAT":
+                    details_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
+                else:
                     details_html += '<div class="currency-grid">'
-                    for curr in crypto_list[:9]:
+                    for curr in fiat_list[:9]:
                         symbol = get_currency_symbol(curr)
-                        details_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
+                        details_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
                     details_html += '</div>'
-                    if len(crypto_list) > 9:
-                        details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
+                    if len(fiat_list) > 9:
+                        details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
+
+            # Supported Crypto
+            crypto_list = details["currencies"][details["currencies"]["currency_type"] == "CRYPTO"]["currency_code"].tolist() if not details["currencies"].empty else []
+            if crypto_list:
+                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Crypto Currencies</div>'
+                details_html += '<div class="currency-grid">'
+                for curr in crypto_list[:9]:
+                    symbol = get_currency_symbol(curr)
+                    details_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
+                details_html += '</div>'
+                if len(crypto_list) > 9:
+                    details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
 
             # Render complete card with details inside - using details/summary as the card wrapper
             st.markdown(f"""
@@ -2049,9 +2216,9 @@ else:
                         <span class="expand-icon">▼</span>
                     </div>
                     <div style="margin-top: 0.75rem;">
-                        <div style="font-size: 0.75rem; color: {t["text_secondary"]}; margin-bottom: 0.5rem; font-weight: 500;">Restrictions & Currencies</div>
-                        <div class="tags-container">
-                            {tags_html if tags_html else '<span class="tag">No data</span>'}
+                        <div style="font-size: 0.75rem; color: {t["text_secondary"]}; margin-bottom: 0.5rem; font-weight: 600;">Supported Games</div>
+                        <div class="games-container">
+                            {''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}
                         </div>
                     </div>
                 </summary>
