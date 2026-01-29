@@ -849,7 +849,7 @@ st.markdown(
         border: none !important;
         box-shadow: none !important;
         outline: none !important;
-        padding: 0 !important;
+        padding: 0.125rem 0.5rem !important;
         margin: 0 !important;
         min-height: 0 !important;
         height: auto !important;
@@ -860,11 +860,16 @@ st.markdown(
         display: inline-flex !important;
         align-items: center !important;
         justify-content: flex-start !important;
+        border: 1px solid transparent !important;
+        border-radius: 0.5rem !important;
       }}
       div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:hover,
       div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) button:hover {{
         color: {t["text_primary"]} !important;
         text-decoration: none !important;
+        background: {t["bg_hover"]} !important;
+        border-color: {t["border"]} !important;
+        font-weight: 600 !important;
       }}
       div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:focus,
       div[data-testid="stHorizontalBlock"]:has(.filter-badges-container) > div:nth-child(2) .stButton > button:focus-visible,
@@ -1645,7 +1650,15 @@ for c in fiat_codes:
     fiat_options.append(label)
     fiat_label_to_code[label] = c
 
-crypto_options = ["All Crypto Currencies"] + crypto
+# Crypto options with symbols
+crypto_codes = crypto
+crypto_options = ["All Crypto Currencies"]
+crypto_label_to_code = {}
+for c in crypto_codes:
+    sym = get_currency_symbol(c)
+    label = f"{sym} {c}".strip() if sym else c
+    crypto_options.append(label)
+    crypto_label_to_code[label] = c
 
 # Sanitize stale state - rerun if any changes needed
 _needs_rerun = False
@@ -1707,7 +1720,7 @@ with st.container(border=True):
             key="f_currency",
         )
 
-        crypto_filter = st.selectbox(
+        crypto_label = st.selectbox(
             "Crypto Currency",
             crypto_options,
             key="f_crypto",
@@ -1729,8 +1742,13 @@ with st.container(border=True):
     if fiat_code:
         active_filters.append(("Currency", fiat_code))
 
-    if crypto_filter != "All Crypto Currencies":
-        active_filters.append(("Crypto", crypto_filter))
+    selected_crypto_code = (
+        crypto_label_to_code.get(crypto_label, "")
+        if crypto_label != "All Crypto Currencies"
+        else ""
+    )
+    if selected_crypto_code:
+        active_filters.append(("Crypto", selected_crypto_code))
 
     if filter_mode != "Supported":
         active_filters.append(("Mode", filter_mode))
@@ -1821,7 +1839,7 @@ if selected_fiat_code:
     )
     params.extend([selected_fiat_code, selected_fiat_code])
 
-if crypto_filter and crypto_filter != "All Crypto Currencies":
+if selected_crypto_code:
     # Check both new and legacy tables
     where.append(
         """
@@ -1839,7 +1857,7 @@ if crypto_filter and crypto_filter != "All Crypto Currencies":
         )
         """
     )
-    params.extend([crypto_filter, crypto_filter])
+    params.extend([selected_crypto_code, selected_crypto_code])
 
 where_sql = "WHERE " + " AND ".join(where) if where else ""
 
