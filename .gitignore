@@ -18,3 +18,8 @@ service_account.json
 
 # Database backups
 db/backups/
+
+# Sync logs
+logs/
+
+/UI_plan.md

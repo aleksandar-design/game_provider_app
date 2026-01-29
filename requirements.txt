@@ -1,6 +1,8 @@
-streamlit
+streamlit==1.53.1
 pandas
 openai>=1.40.0
 google-api-python-client
 google-auth
 openpyxl
+requests
+tomli

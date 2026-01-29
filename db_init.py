@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS providers (
 CREATE TABLE IF NOT EXISTS restrictions (
   provider_id       INTEGER NOT NULL,
   country_code      TEXT NOT NULL, -- ISO3 code
-  restriction_type  TEXT NOT NULL DEFAULT 'BLOCKED' CHECK(restriction_type IN ('BLOCKED','CONDITIONAL','REGULATED')),
+  restriction_type  TEXT NOT NULL DEFAULT 'RESTRICTED' CHECK(restriction_type IN ('RESTRICTED','REGULATED')),
   source            TEXT,
   PRIMARY KEY (provider_id, country_code),
   FOREIGN KEY (provider_id) REFERENCES providers(provider_id) ON DELETE CASCADE
@@ -83,17 +83,27 @@ CREATE TABLE IF NOT EXISTS backups (
 CREATE TABLE IF NOT EXISTS games (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_id     INTEGER NOT NULL,
-  wallet_game_id  TEXT,
-  game_title      TEXT NOT NULL,
-  game_provider   TEXT,
-  vendor          TEXT,
-  game_type       TEXT,
+  game_id         INTEGER,           -- API id
+  title           TEXT NOT NULL,
+  platform        TEXT,              -- desktop-and-mobile, etc.
+  game_type       TEXT,              -- slots, live, etc.
+  subtype         TEXT,              -- casino, etc.
+  enabled         INTEGER DEFAULT 1,
+  fun_mode        INTEGER DEFAULT 0,
+  rtp             REAL,              -- e.g. 94.59
+  volatility      TEXT,              -- e.g. "5"
+  features        TEXT,              -- JSON array
+  themes          TEXT,              -- JSON array
+  tags            TEXT,              -- JSON array
+  thumbnail       TEXT,              -- main thumbnail URL
+  api_provider    TEXT,              -- original API provider name
   source          TEXT,
   FOREIGN KEY (provider_id) REFERENCES providers(provider_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_games_provider ON games(provider_id);
 CREATE INDEX IF NOT EXISTS idx_games_type ON games(game_type);
+CREATE INDEX IF NOT EXISTS idx_games_game_id ON games(game_id);
 """
 
 def main() -> None:

@@ -5,6 +5,8 @@ import re
 import sqlite3
 import hashlib
 import base64
+import secrets
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -26,16 +28,37 @@ def get_session_secret():
     return hashlib.sha256(f"session_salt_{get_admin_password()}".encode()).hexdigest()[:32]
 
 def generate_session_token():
-    """Generate a session token for persistent login."""
+    """Generate a session token with expiry (7 days) and randomness."""
     secret = get_session_secret()
-    return hashlib.sha256(f"auth_{secret}".encode()).hexdigest()[:24]
+    expiry = int(time.time()) + (7 * 24 * 60 * 60)  # 7 days from now
+    random_part = secrets.token_hex(8)
+    # Format: {expiry_timestamp}.{random}.{signature}
+    data = f"{expiry}.{random_part}"
+    signature = hashlib.sha256(f"{data}.{secret}".encode()).hexdigest()[:16]
+    return f"{data}.{signature}"
 
 def verify_session_token(token: str) -> bool:
-    """Verify if a session token is valid."""
+    """Verify if a session token is valid and not expired."""
     if not token:
         return False
-    expected = generate_session_token()
-    return token == expected
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return False
+        expiry_str, random_part, signature = parts
+        expiry = int(expiry_str)
+
+        # Check expiry
+        if time.time() > expiry:
+            return False
+
+        # Verify signature
+        secret = get_session_secret()
+        data = f"{expiry_str}.{random_part}"
+        expected_sig = hashlib.sha256(f"{data}.{secret}".encode()).hexdigest()[:16]
+        return signature == expected_sig
+    except (ValueError, AttributeError):
+        return False
 
 def is_admin():
     return bool(st.session_state.get("is_admin", False))
@@ -79,10 +102,8 @@ THEMES = {
         "primary_foreground": "#FFFFFF",
         # Tags
         "tag_bg": "#16233B",
-        "tag_blocked_bg": "#7F1D1D",
-        "tag_blocked_text": "#FB7185",
-        "tag_conditional_bg": "#78350F",
-        "tag_conditional_text": "#FACC15",
+        "tag_restricted_bg": "#78350F",
+        "tag_restricted_text": "#FACC15",
         "tag_regulated_bg": "#1C3D66",
         "tag_regulated_text": "#67E8F9",
         "tag_fiat_bg": "#064E3B",
@@ -124,10 +145,8 @@ THEMES = {
         "primary_foreground": "#FFFFFF",
         # Tags - better contrast
         "tag_bg": "#F1F5F9",
-        "tag_blocked_bg": "#FEE2E2",
-        "tag_blocked_text": "#DC2626",
-        "tag_conditional_bg": "#FEF3C7",
-        "tag_conditional_text": "#B45309",
+        "tag_restricted_bg": "#FEF3C7",
+        "tag_restricted_text": "#B45309",
         "tag_regulated_bg": "#DBEAFE",
         "tag_regulated_text": "#1D4ED8",
         "tag_fiat_bg": "#D1FAE5",
@@ -315,8 +334,7 @@ st.markdown(
         font-weight: 500;
         color: {t["text_muted"]};
       }}
-      .tag.blocked {{ background: {t["tag_blocked_bg"]}; color: {t["tag_blocked_text"]}; }}
-      .tag.conditional {{ background: {t["tag_conditional_bg"]}; color: {t["tag_conditional_text"]}; }}
+      .tag.restricted {{ background: {t["tag_restricted_bg"]}; color: {t["tag_restricted_text"]}; }}
       .tag.regulated {{ background: {t["tag_regulated_bg"]}; color: {t["tag_regulated_text"]}; }}
       .tag.fiat {{ background: {t["tag_fiat_bg"]}; color: {t["tag_fiat_text"]}; }}
       .tag.crypto {{ background: {t["tag_crypto_bg"]}; color: {t["tag_crypto_text"]}; }}
@@ -350,6 +368,88 @@ st.markdown(
         border-radius: 4px;
         font-size: 0.7rem;
         font-weight: 600;
+      }}
+
+      /* Active filter badges */
+      .active-filters-container {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem 0;
+      }}
+      .filter-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.75rem;
+        background: {"#E0F2FE" if current_theme == "light" else "#1E3A8A"};
+        border: none !important;
+        outline: none !important;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        color: {"#0369A1" if current_theme == "light" else "#93C5FD"};
+        font-weight: 500;
+      }}
+      .filter-badge-label {{
+        color: {"#0369A1" if current_theme == "light" else "#93C5FD"};
+        font-weight: 500;
+      }}
+      .filter-badge-value {{
+        color: {"#0284C7" if current_theme == "light" else "#BFDBFE"};
+        font-weight: 600;
+      }}
+      /* Filter badges container - match React flexbox */
+      .filter-badges-container {{
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        flex-wrap: wrap !important;
+        margin: 0 !important;
+        vertical-align: middle !important;
+      }}
+
+      /* Make the parent of badges container inline */
+      div:has(> .filter-badges-container) {{
+        display: inline-block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }}
+
+      /* Position clear button inline - targets the button's container div */
+      div:has(> .filter-badges-container) + div {{
+        display: inline-block !important;
+        margin: 0 !important;
+        margin-left: 0.5rem !important;
+        padding: 0 !important;
+        vertical-align: middle !important;
+      }}
+
+      /* Clear all button styling - transparent ghost style */
+      button[key="btn_clear_all"] {{
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        color: {t["text_secondary"]} !important;
+        padding: 0.125rem 0.5rem !important;
+        margin: 0 !important;
+        font-size: 0.75rem !important;
+        font-weight: 400 !important;
+        min-height: 1.5rem !important;
+        height: 1.5rem !important;
+        line-height: 1.5 !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+      }}
+
+      button[key="btn_clear_all"]:hover {{
+        color: {t["text_primary"]} !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        text-decoration: underline !important;
+        transform: none !important;
       }}
 
       /* Currency buttons grid - Figma style */
@@ -666,8 +766,7 @@ def get_provider_details(pid):
         "SELECT country_code, restriction_type FROM restrictions WHERE provider_id=? ORDER BY restriction_type, country_code",
         (pid,),
     )
-    blocked = restrictions[restrictions["restriction_type"] == "BLOCKED"]["country_code"].tolist()
-    conditional = restrictions[restrictions["restriction_type"] == "CONDITIONAL"]["country_code"].tolist()
+    restricted = restrictions[restrictions["restriction_type"] == "RESTRICTED"]["country_code"].tolist()
     regulated = restrictions[restrictions["restriction_type"] == "REGULATED"]["country_code"].tolist()
 
     # Try new tables first, fall back to legacy
@@ -690,8 +789,7 @@ def get_provider_details(pid):
 
     return {
         "provider": prov.iloc[0],
-        "blocked": blocked,
-        "conditional": conditional,
+        "restricted": restricted,
         "regulated": regulated,
         "currencies": currencies,
     }
@@ -773,12 +871,18 @@ def upsert_provider_by_name(provider_name: str, currency_mode: str) -> int:
         return int(cur2.lastrowid)
 
 
-def replace_ai_restrictions(provider_id: int, iso3_list: list[str]):
+def replace_ai_restrictions(provider_id: int, iso3_list: list[str], restriction_type: str = "RESTRICTED"):
     with db() as con:
-        con.execute("DELETE FROM restrictions WHERE provider_id=? AND source='ai_import'", (provider_id,))
+        con.execute(
+            "DELETE FROM restrictions WHERE provider_id=? AND source='ai_import' AND restriction_type=?",
+            (provider_id, restriction_type),
+        )
         con.executemany(
-            "INSERT OR IGNORE INTO restrictions(provider_id, country_code, source) VALUES (?, ?, 'ai_import')",
-            [(provider_id, code) for code in iso3_list],
+            """
+            INSERT OR IGNORE INTO restrictions(provider_id, country_code, restriction_type, source)
+            VALUES (?, ?, ?, 'ai_import')
+            """,
+            [(provider_id, code, restriction_type) for code in iso3_list],
         )
         con.commit()
 
@@ -1148,20 +1252,20 @@ def show_login_page():
 
         /* Error message */
         [data-testid="stAlert"] {{
-            background: {t["tag_blocked_bg"]} !important;
-            border: 1px solid {t["tag_blocked_text"]}40 !important;
+            background: #7F1D1D !important;
+            border: 1px solid {t["chart_red"]}40 !important;
         }}
         [data-testid="stAlert"] * {{
-            color: {t["tag_blocked_text"]} !important;
+            color: {t["chart_red"]} !important;
         }}
         [data-testid="stAlert"] p {{
-            color: {t["tag_blocked_text"]} !important;
+            color: {t["chart_red"]} !important;
         }}
         [data-testid="stAlert"] [data-testid="stMarkdownContainer"] {{
-            color: {t["tag_blocked_text"]} !important;
+            color: {t["chart_red"]} !important;
         }}
         [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {{
-            color: {t["tag_blocked_text"]} !important;
+            color: {t["chart_red"]} !important;
         }}
     </style>
 
@@ -1284,24 +1388,8 @@ else:
         <div style="font-size:0.7rem;color:{t["text_secondary"]};letter-spacing:0.1em;">iGAMING PLATFORM</div>
     </div>'''
 
-# Add CSS to push header buttons to the right
-st.markdown(f'''
-<style>
-    /* Header row - push buttons to right */
-    .header-row-container > [data-testid="stHorizontalBlock"] {{
-        justify-content: space-between !important;
-        align-items: center !important;
-    }}
-    .header-row-container > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {{
-        flex-grow: 0 !important;
-    }}
-    /* Remove flex calc from header button columns */
-    .st-emotion-cache-q1blxj {{
-        flex: none !important;
-        width: auto !important;
-    }}
-</style>
-''', unsafe_allow_html=True)
+# Note: Header buttons use column ratios [2, 12, 0.5, 1] to push buttons right
+# No additional CSS needed - the spacer column handles alignment
 
 # Header with columns - logo left, spacer grows to push buttons right
 logo_col, spacer, theme_col, logout_col = st.columns([2, 12, 0.5, 1])
@@ -1330,6 +1418,16 @@ st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom:
 # =================================================
 # Filters
 # =================================================
+# Check if clear all was clicked (must be before widget initialization)
+if st.session_state.get("_clear_all_clicked", False):
+    st.session_state["f_mode"] = "Supported"
+    st.session_state["f_search"] = ""
+    st.session_state["f_country"] = "All Countries"
+    st.session_state["f_currency"] = "All Currencies"
+    st.session_state["f_crypto"] = "All Crypto Currencies"
+    st.session_state["_clear_all_clicked"] = False
+    st.rerun()
+
 # Initialize all filter defaults BEFORE widgets (proper Streamlit pattern)
 if "f_mode" not in st.session_state:
     st.session_state["f_mode"] = "Supported"
@@ -1393,6 +1491,41 @@ with st.container(border=True):
     with h1:
         crypto_filter = st.selectbox("💎 Crypto Currency", crypto_options, key="f_crypto")
 
+    # Active filter badges
+    active_filters = []
+    if search:
+        active_filters.append(("Search", search))
+    if country_label != "All Countries":
+        active_filters.append(("Country", country_label))
+    if currency != "All Currencies":
+        active_filters.append(("Currency", currency))
+    if crypto_filter != "All Crypto Currencies":
+        active_filters.append(("Crypto", crypto_filter))
+    if filter_mode != "Supported":
+        active_filters.append(("Mode", filter_mode))
+
+    if active_filters:
+        # Badges HTML
+        badges_html = '<div class="filter-badges-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 0; margin: 0;">'
+        badges_html += f'<span style="color: {t["text_secondary"]}; font-size: 0.85rem; font-weight: 500;">Active filters:</span>'
+
+        for label, value in active_filters:
+            # Truncate long values
+            display_value = value if len(str(value)) <= 30 else str(value)[:27] + "..."
+            # Match Figma: bg-primary/20 with border-transparent
+            bg_color = "rgba(14, 165, 233, 0.2)" if current_theme == "light" else "rgba(30, 58, 138, 1)"
+            text_color = "#0369A1" if current_theme == "light" else "#93C5FD"
+            # Badge with transparent border (React: border-transparent) - no visible border
+            badges_html += f'<span style="display: inline-flex; align-items: center; gap: 0.35rem; background: {bg_color}; color: {text_color}; border: 1px solid transparent; outline: none; box-shadow: none; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; line-height: 1.5;"><span style="font-weight: 500;">{label}:</span> <span style="font-weight: 600;">{display_value}</span></span>'
+
+        badges_html += '</div>'
+        st.markdown(badges_html, unsafe_allow_html=True)
+
+        # Clear button (CSS will position it inline)
+        if st.button("Clear all", key="btn_clear_all", type="secondary"):
+            st.session_state["_clear_all_clicked"] = True
+            st.rerun()
+
 # =================================================
 # Query building
 # =================================================
@@ -1406,42 +1539,64 @@ if search:
 country_iso = label_to_iso.get(country_label, "")
 if country_iso:
     if filter_mode == "Supported":
-        where.append("p.provider_id NOT IN (SELECT provider_id FROM restrictions WHERE country_code=?)")
+        where.append("""
+            p.provider_id NOT IN (
+                SELECT provider_id
+                FROM restrictions
+                WHERE country_code=? AND restriction_type='RESTRICTED'
+            )
+        """)
         params.append(country_iso)
     else:  # Restricted
-        where.append("p.provider_id IN (SELECT provider_id FROM restrictions WHERE country_code=?)")
+        where.append("""
+            p.provider_id IN (
+                SELECT provider_id
+                FROM restrictions
+                WHERE country_code=? AND restriction_type='RESTRICTED'
+            )
+        """)
         params.append(country_iso)
 
 if currency and currency != "All Currencies":
-    # Works with both new and legacy tables
+    # Check both new and legacy tables
     where.append(
         """
         (
             p.currency_mode='ALL_FIAT'
             OR EXISTS (
+                SELECT 1 FROM fiat_currencies fc
+                WHERE fc.provider_id=p.provider_id AND fc.currency_code=?
+            )
+            OR EXISTS (
                 SELECT 1 FROM currencies c
                 WHERE c.provider_id=p.provider_id
-                AND c.currency_type='FIAT'
-                AND c.currency_code=?
+                  AND c.currency_type='FIAT'
+                  AND c.currency_code=?
             )
         )
         """
     )
-    params.append(currency)
+    params.extend([currency, currency])
 
 if crypto_filter and crypto_filter != "All Crypto Currencies":
-    # Works with both new and legacy tables
+    # Check both new and legacy tables
     where.append(
         """
-        EXISTS (
-            SELECT 1 FROM currencies c
-            WHERE c.provider_id=p.provider_id
-            AND c.currency_type='CRYPTO'
-            AND c.currency_code=?
+        (
+            EXISTS (
+                SELECT 1 FROM crypto_currencies cc
+                WHERE cc.provider_id=p.provider_id AND cc.currency_code=?
+            )
+            OR EXISTS (
+                SELECT 1 FROM currencies c
+                WHERE c.provider_id=p.provider_id
+                  AND c.currency_type='CRYPTO'
+                  AND c.currency_code=?
+            )
         )
         """
     )
-    params.append(crypto_filter)
+    params.extend([crypto_filter, crypto_filter])
 
 where_sql = "WHERE " + " AND ".join(where) if where else ""
 
@@ -1528,14 +1683,11 @@ else:
             # Build tags HTML
             tags_html = ""
             if details:
-                blocked_count = len(details["blocked"])
-                conditional_count = len(details["conditional"])
+                restricted_count = len(details["restricted"])
                 regulated_count = len(details["regulated"])
 
-                if blocked_count > 0:
-                    tags_html += f'<span class="tag blocked">Blocked: {blocked_count}</span>'
-                if conditional_count > 0:
-                    tags_html += f'<span class="tag conditional">Restricted: {conditional_count}</span>'
+                if restricted_count > 0:
+                    tags_html += f'<span class="tag restricted">Restricted: {restricted_count}</span>'
                 if regulated_count > 0:
                     tags_html += f'<span class="tag regulated">Regulated: {regulated_count}</span>'
 
@@ -1572,26 +1724,15 @@ else:
                             result.append({"iso3": iso3, "iso2": iso3[:2], "name": iso3})
                     return result
 
-                # Blocked Countries
-                if details["blocked"]:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_red"]};">✕</span> Blocked Countries ({len(details["blocked"])})</div>'
-                    blocked_countries = get_country_info(details["blocked"][:20])
-                    details_html += f'<div class="country-tags">'
-                    for c in blocked_countries:
-                        details_html += f'<span class="country-tag" style="border-color: {t["tag_blocked_text"]};"><span class="iso" style="background: {t["tag_blocked_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                    if len(details["blocked"]) > 20:
-                        details_html += f'<span class="country-tag">+{len(details["blocked"]) - 20} more</span>'
-                    details_html += '</div>'
-
                 # Restricted Countries
-                if details["conditional"]:
-                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["conditional"])})</div>'
-                    conditional_countries = get_country_info(details["conditional"][:20])
-                    details_html += '<div class="country-tags">'
-                    for c in conditional_countries:
-                        details_html += f'<span class="country-tag" style="border-color: {t["tag_conditional_text"]};"><span class="iso" style="background: {t["tag_conditional_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                    if len(details["conditional"]) > 20:
-                        details_html += f'<span class="country-tag">+{len(details["conditional"]) - 20} more</span>'
+                if details["restricted"]:
+                    details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
+                    restricted_countries = get_country_info(details["restricted"][:20])
+                    details_html += f'<div class="country-tags">'
+                    for c in restricted_countries:
+                        details_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                    if len(details["restricted"]) > 20:
+                        details_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
                     details_html += '</div>'
 
                 # Regulated Countries
@@ -1737,3 +1878,22 @@ if is_admin():
                         replace_ai_fiat_currencies(pid, plan["fiat_codes"])
                     st.success(f"Imported {provider_name} (ID: {pid})")
                     st.cache_data.clear()
+
+    # =================================================
+    # Admin: API Sync — Sync providers and games from API
+    # =================================================
+    with st.expander("🔄 Admin: Sync from API", expanded=False):
+        st.caption(
+            "Sync providers and games from the external API. "
+            "Existing restrictions and currencies are preserved."
+        )
+
+        if st.button("Sync Providers & Games", type="primary", key="btn_api_sync"):
+            with st.spinner("Syncing from API..."):
+                try:
+                    from api_sync import sync_all
+                    result = sync_all()
+                    st.success(f"Synced {result['providers']} providers, {result['games']} games")
+                    st.cache_data.clear()
+                except Exception as e:
+                    st.error(f"Sync failed: {e}")
