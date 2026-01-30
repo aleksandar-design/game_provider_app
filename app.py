@@ -811,14 +811,24 @@ st.markdown(
         background: {t["bg_hover"]} !important;
       }}
 
+      /* Provider cards grid container */
+      .provider-cards {{
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+      }}
+
       /* Provider card styling - using details element */
       .provider-card {{
         background: {"#F3F4F6" if current_theme == "light" else t["bg_card"]};
         border: 1px solid {"#E5E7EB" if current_theme == "light" else t["border"]};
         border-radius: 12px;
-        margin-bottom: 0.75rem;
         box-shadow: 0 1px 3px {t["shadow"]};
         transition: all 0.2s ease;
+      }}
+      /* Full width when card is expanded */
+      .provider-card[open] {{
+        grid-column: 1 / -1;
       }}
       .provider-card:hover {{
         box-shadow: 0 8px 24px {t["shadow"]};
@@ -2145,9 +2155,8 @@ with pcol3:
     )
 
 # =================================================
-# Provider cards (2-column grid)
+# Provider cards (CSS Grid - expands to full width when open)
 # =================================================
-st.markdown('<div class="provider-cards">', unsafe_allow_html=True)
 if df.empty:
     st.info("No providers match your filters.")
 else:
@@ -2184,7 +2193,6 @@ else:
                 restricted_map.setdefault(row.provider_id, []).append(row.country_code)
 
     # Bulk load currencies
-    empty_currencies_df = pd.DataFrame(columns=["currency_code", "currency_type"])
     try:
         fiat_df = qdf(
             f"""
@@ -2212,11 +2220,15 @@ else:
             """,
             tuple(provider_ids),
         )
-    currencies_grouped = (
-        {pid: grp for pid, grp in currencies_df.groupby("provider_id")}
-        if not currencies_df.empty
-        else {}
-    )
+    # Pre-build fiat and crypto maps for O(1) lookup (avoid pandas filter per card)
+    fiat_map = {}
+    crypto_map = {}
+    if not currencies_df.empty:
+        for row in currencies_df.itertuples(index=False):
+            if row.currency_type == "FIAT":
+                fiat_map.setdefault(row.provider_id, []).append(row.currency_code)
+            else:
+                crypto_map.setdefault(row.provider_id, []).append(row.currency_code)
     currency_count_map = (
         currencies_df.groupby("provider_id").size().to_dict()
         if not currencies_df.empty
@@ -2275,24 +2287,24 @@ else:
             return mapping[normalized]
         return normalized.replace("_", " ").title()
 
-    # Helper to get country info from ISO3
+    # Pre-build dict lookup for O(1) country info access (instead of O(n) pandas filter)
+    countries_lookup = {
+        row.iso3: {"iso2": row.iso2 if pd.notna(row.iso2) else row.iso3[:2], "name": row.name}
+        for row in countries_df.itertuples(index=False)
+    }
+
     def get_country_info(iso3_list):
         result = []
         for iso3 in iso3_list:
-            match = countries_df[countries_df["iso3"] == iso3]
-            if not match.empty:
-                row = match.iloc[0]
-                result.append({
-                    "iso3": iso3,
-                    "iso2": row.get("iso2", iso3[:2]) or iso3[:2],
-                    "name": row["name"]
-                })
+            if iso3 in countries_lookup:
+                info = countries_lookup[iso3]
+                result.append({"iso3": iso3, "iso2": info["iso2"], "name": info["name"]})
             else:
                 result.append({"iso3": iso3, "iso2": iso3[:2], "name": iso3})
         return result
 
-    # Create two columns for the grid
-    col1, col2 = st.columns(2)
+    # Build all cards HTML for CSS Grid
+    all_cards_html = []
 
     for idx, row in df.iterrows():
         pid = row["ID"]
@@ -2306,139 +2318,113 @@ else:
         details = {
             "restricted": restricted_map.get(pid, []),
             "regulated": regulated_map.get(pid, []),
-            "currencies": currencies_grouped.get(pid, empty_currencies_df),
             "currency_mode": provider_currency_mode.get(pid, "ALL_FIAT"),
         }
         supported_games = sorted(
             {format_game_type(gt) for gt in game_types_map.get(pid, []) if gt}
         )
 
-        # Alternate between columns
-        target_col = col1 if idx % 2 == 0 else col2
+        # Build Countries section HTML
+        countries_html = ""
+        # Restricted Countries
+        if details["restricted"]:
+            countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
+            restricted_countries = get_country_info(details["restricted"][:20])
+            countries_html += f'<div class="country-tags">'
+            for c in restricted_countries:
+                countries_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+            if len(details["restricted"]) > 20:
+                countries_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
+            countries_html += '</div>'
 
-        with target_col:
-            # Build Countries section HTML
-            countries_html = ""
-            # Restricted Countries
-            if details["restricted"]:
-                countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
-                restricted_countries = get_country_info(details["restricted"][:20])
-                countries_html += f'<div class="country-tags">'
-                for c in restricted_countries:
-                    countries_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                if len(details["restricted"]) > 20:
-                    countries_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
-                countries_html += '</div>'
+        # Regulated Countries
+        if details["regulated"]:
+            countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
+            regulated_countries = get_country_info(details["regulated"][:20])
+            countries_html += '<div class="country-tags">'
+            for c in regulated_countries:
+                countries_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+            if len(details["regulated"]) > 20:
+                countries_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
+            countries_html += '</div>'
 
-            # Regulated Countries
-            if details["regulated"]:
-                countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
-                regulated_countries = get_country_info(details["regulated"][:20])
-                countries_html += '<div class="country-tags">'
-                for c in regulated_countries:
-                    countries_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
-                if len(details["regulated"]) > 20:
-                    countries_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
-                countries_html += '</div>'
+        # Supported Currencies - build fiat and crypto HTML
+        fiat_html = ""
+        crypto_html = ""
 
-            # Supported Currencies - build fiat and crypto HTML
-            fiat_html = ""
-            crypto_html = ""
-
-            # Build fiat HTML
-            fiat_list = details["currencies"][details["currencies"]["currency_type"] == "FIAT"]["currency_code"].tolist() if not details["currencies"].empty else []
-            has_fiat = details["currency_mode"] == "ALL_FIAT" or bool(fiat_list)
-            if has_fiat:
-                fiat_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Fiat Currencies</div>'
-                if details["currency_mode"] == "ALL_FIAT":
-                    fiat_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
-                else:
-                    fiat_html += '<div class="currency-grid">'
-                    for curr in fiat_list[:9]:
-                        symbol = get_currency_symbol(curr)
-                        fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
-                    fiat_html += '</div>'
-                    if len(fiat_list) > 9:
-                        fiat_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
-
-            # Build crypto HTML
-            crypto_list = details["currencies"][details["currencies"]["currency_type"] == "CRYPTO"]["currency_code"].tolist() if not details["currencies"].empty else []
-            has_crypto = bool(crypto_list)
-            if has_crypto:
-                crypto_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Crypto Currencies</div>'
-                crypto_html += '<div class="currency-grid">'
-                for curr in crypto_list[:9]:
+        # Build fiat HTML
+        fiat_list = fiat_map.get(pid, [])
+        has_fiat = details["currency_mode"] == "ALL_FIAT" or bool(fiat_list)
+        if has_fiat:
+            fiat_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Fiat Currencies</div>'
+            if details["currency_mode"] == "ALL_FIAT":
+                fiat_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
+            else:
+                fiat_html += '<div class="currency-grid">'
+                for curr in fiat_list[:9]:
                     symbol = get_currency_symbol(curr)
-                    crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
-                crypto_html += '</div>'
-                if len(crypto_list) > 9:
-                    crypto_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
+                    fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
+                fiat_html += '</div>'
+                if len(fiat_list) > 9:
+                    fiat_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
 
-            # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
-            currencies_html = ""
-            if has_fiat and has_crypto:
-                # Generate unique ID for this provider's currency tabs
-                tab_id = f"curr_{pid}"
-                currencies_html = (
-                    f'<div class="currency-tabs">'
-                    f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
-                    f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
-                    f'<div class="currency-tab-buttons">'
-                    f'<label for="{tab_id}-fiat" class="subtab">{svg_icon("card", "currentColor", 14)} Fiat</label>'
-                    f'<label for="{tab_id}-crypto" class="subtab">{svg_icon("crypto", "currentColor", 14)} Crypto</label>'
+        # Build crypto HTML
+        crypto_list = crypto_map.get(pid, [])
+        has_crypto = bool(crypto_list)
+        if has_crypto:
+            crypto_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Crypto Currencies</div>'
+            crypto_html += '<div class="currency-grid">'
+            for curr in crypto_list[:9]:
+                symbol = get_currency_symbol(curr)
+                crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
+            crypto_html += '</div>'
+            if len(crypto_list) > 9:
+                crypto_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
 
-                    f'</div>'
-                    f'<div class="fiat-panel">{fiat_html}</div>'
-                    f'<div class="crypto-panel">{crypto_html}</div>'
-                    f'</div>'
-                )
-            elif has_fiat:
-                currencies_html = fiat_html
-            elif has_crypto:
-                currencies_html = crypto_html
-
-            # Build top-level tabs wrapper (buttons)
-            details_html = (
-                f'<div class="provider-main-tabs">'
-                f'<div class="main-tab-buttons">'
-                f'<button class="main-tab active" data-target="currencies" type="button">{svg_icon("wallet", "currentColor", 14)} Currencies</button>'
-                f'<button class="main-tab" data-target="countries" type="button">{svg_icon("globe", "currentColor", 14)} Countries</button>'
-                f'<button class="main-tab" data-target="gamelist" type="button">{svg_icon("gamepad", "currentColor", 14)} Game List</button>'
-                f'<button class="main-tab" data-target="assets" type="button">{svg_icon("folder", "currentColor", 14)} Assets</button>'
+        # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
+        currencies_html = ""
+        if has_fiat and has_crypto:
+            # Generate unique ID for this provider's currency tabs
+            tab_id = f"curr_{pid}"
+            currencies_html = (
+                f'<div class="currency-tabs">'
+                f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
+                f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
+                f'<div class="currency-tab-buttons">'
+                f'<label for="{tab_id}-fiat" class="subtab">{svg_icon("card", "currentColor", 14)} Fiat</label>'
+                f'<label for="{tab_id}-crypto" class="subtab">{svg_icon("crypto", "currentColor", 14)} Crypto</label>'
                 f'</div>'
-                f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
-                f'<div class="main-panel countries-panel">{countries_html}</div>'
-                f'<div class="main-panel gamelist-panel"><p style="color:{t["text_muted"]};">Game list coming soon</p></div>'
-                f'<div class="main-panel assets-panel"><p style="color:{t["text_muted"]};">Assets coming soon</p></div>'
+                f'<div class="fiat-panel">{fiat_html}</div>'
+                f'<div class="crypto-panel">{crypto_html}</div>'
                 f'</div>'
             )
+        elif has_fiat:
+            currencies_html = fiat_html
+        elif has_crypto:
+            currencies_html = crypto_html
 
-            # Render complete card with details inside - using details/summary as the card wrapper
-            st.markdown(f"""
-            <details class="provider-card">
-                <summary class="card-header">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                        <div style="display: flex; gap: 0.75rem; align-items: center;">
-                            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, {t["bg_hover"]} 0%, {t["bg_secondary"]} 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">{svg_icon("gamepad", t["primary"], 24)}</div>
-                            <div>
-                                <div style="font-size: 1rem; font-weight: 600; color: {t["text_primary"]};">{pname}</div>
-                                <div style="font-size: 0.8rem; color: {t["text_secondary"]};">{stats['games']} games</div>
-                            </div>
-                        </div>
-                        <span class="expand-icon">▼</span>
-                    </div>
-                    <div style="margin-top: 0.75rem;">
-                        <div style="font-size: 0.75rem; color: {t["text_secondary"]}; margin-bottom: 0.5rem; font-weight: 600;">Supported Games</div>
-                        <div class="games-container">
-                            {''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}
-                        </div>
-                    </div>
-                </summary>
-                <div class="card-details-content">
-                    {details_html if details_html else '<p style="color: ' + t["text_muted"] + ';">No details available</p>'}
-                </div>
-            </details>
-            """, unsafe_allow_html=True)
+        # Build top-level tabs wrapper (buttons)
+        details_html = (
+            f'<div class="provider-main-tabs">'
+            f'<div class="main-tab-buttons">'
+            f'<button class="main-tab active" data-target="currencies" type="button">{svg_icon("wallet", "currentColor", 14)} Currencies</button>'
+            f'<button class="main-tab" data-target="countries" type="button">{svg_icon("globe", "currentColor", 14)} Countries</button>'
+            f'<button class="main-tab" data-target="gamelist" type="button">{svg_icon("gamepad", "currentColor", 14)} Game List</button>'
+            f'<button class="main-tab" data-target="assets" type="button">{svg_icon("folder", "currentColor", 14)} Assets</button>'
+            f'</div>'
+            f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
+            f'<div class="main-panel countries-panel">{countries_html}</div>'
+            f'<div class="main-panel gamelist-panel"><p style="color:{t["text_muted"]};">Game list coming soon</p></div>'
+            f'<div class="main-panel assets-panel"><p style="color:{t["text_muted"]};">Assets coming soon</p></div>'
+            f'</div>'
+        )
+
+        # Build card HTML
+        card_html = f'''<details class="provider-card"><summary class="card-header"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;"><div style="display:flex;gap:0.75rem;align-items:center;"><div style="width:48px;height:48px;background:linear-gradient(135deg,{t["bg_hover"]} 0%,{t["bg_secondary"]} 100%);border-radius:12px;display:flex;align-items:center;justify-content:center;">{svg_icon("gamepad", t["primary"], 24)}</div><div><div style="font-size:1rem;font-weight:600;color:{t["text_primary"]};">{pname}</div><div style="font-size:0.8rem;color:{t["text_secondary"]};">{stats['games']} games</div></div></div><span class="expand-icon">▼</span></div><div style="margin-top:0.75rem;"><div style="font-size:0.75rem;color:{t["text_secondary"]};margin-bottom:0.5rem;font-weight:600;">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></summary><div class="card-details-content">{details_html if details_html else '<p style="color:' + t["text_muted"] + ';">No details available</p>'}</div></details>'''
+        all_cards_html.append(card_html)
+
+    # Render all cards in grid container
+    st.markdown(f'<div class="provider-cards">{"".join(all_cards_html)}</div>', unsafe_allow_html=True)
 
 # =================================================
 # Admin: AI Agent — Import provider from Excel
