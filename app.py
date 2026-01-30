@@ -177,6 +177,22 @@ THEMES = {
 }
 
 # =================================================
+# SVG Icons (inline, theme-aware)
+# =================================================
+def svg_icon(name: str, color: str = "currentColor", size: int = 16) -> str:
+    """Return inline SVG icon by name."""
+    icons = {
+        "wallet": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+        "globe": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+        "gamepad": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>',
+        "folder": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+        "card": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+        "crypto": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="6"/><circle cx="16" cy="9" r="6"/></svg>',
+        "dice": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="{color}"/><circle cx="15.5" cy="8.5" r="1.5" fill="{color}"/><circle cx="8.5" cy="15.5" r="1.5" fill="{color}"/><circle cx="15.5" cy="15.5" r="1.5" fill="{color}"/></svg>',
+    }
+    return icons.get(name, "")
+
+# =================================================
 # Page config + styling
 # =================================================
 st.set_page_config(page_title="Game Providers", layout="wide", initial_sidebar_state="collapsed")
@@ -242,6 +258,10 @@ st.markdown(
         display: flex;
         gap: 0.5rem;
         align-items: center;
+      }}
+      /* Tighter gap for header buttons */
+      [data-testid="stHorizontalBlock"]:has(.st-key-btn_theme) {{
+        gap: 0.25rem !important;
       }}
 
       /* Filter container - style bordered containers */
@@ -569,6 +589,13 @@ st.markdown(
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+      }}
+      .currency-tabs label.subtab svg {{
+        flex-shrink: 0;
       }}
       .currency-tabs label.subtab:hover {{
         background: rgba(255, 255, 255, 0.08);
@@ -619,6 +646,13 @@ st.markdown(
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+      }}
+      .provider-main-tabs .main-tab svg {{
+        flex-shrink: 0;
       }}
       .provider-main-tabs .main-tab:hover {{
         background: rgba(255, 255, 255, 0.08);
@@ -1770,25 +1804,26 @@ else:
 # No additional CSS needed - the spacer column handles alignment
 
 # Header with columns - logo left, spacer grows to push buttons right
-logo_col, spacer, theme_col, logout_col = st.columns([2, 12, 0.5, 1])
+logo_col, spacer, buttons_col = st.columns([2, 12, 1.5])
 
 with logo_col:
     st.markdown(logo_html, unsafe_allow_html=True)
 
-with theme_col:
-    def toggle_theme():
-        new_theme = "light" if get_theme() == "dark" else "dark"
-        set_theme(new_theme)
-    # Moon icon for current dark mode, sun for light mode
-    theme_icon = "☀" if current_theme == "dark" else "☾"
-    st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
-
-with logout_col:
-    if st.button("→ Logout", key="btn_logout"):
-        st.session_state["is_admin"] = False
-        if "session" in st.query_params:
-            del st.query_params["session"]
-        st.rerun()
+with buttons_col:
+    theme_btn, logout_btn = st.columns([1, 2], gap="small")
+    with theme_btn:
+        def toggle_theme():
+            new_theme = "light" if get_theme() == "dark" else "dark"
+            set_theme(new_theme)
+        # Moon icon for current dark mode, sun for light mode
+        theme_icon = "☀" if current_theme == "dark" else "☾"
+        st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
+    with logout_btn:
+        if st.button("→ Logout", key="btn_logout"):
+            st.session_state["is_admin"] = False
+            if "session" in st.query_params:
+                del st.query_params["session"]
+            st.rerun()
 
 # Header divider
 st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
@@ -2077,14 +2112,14 @@ st.markdown(f"""
             <div class="stat-label">Total Providers</div>
             <div class="stat-value">{len(df)}</div>
         </div>
-        <div class="stat-icon providers">🎮</div>
+        <div class="stat-icon providers">{svg_icon("gamepad", t["primary"], 20)}</div>
     </div>
     <div class="stat-card">
         <div>
             <div class="stat-label">Total Games</div>
             <div class="stat-value">{total_games}</div>
         </div>
-        <div class="stat-icon currencies">🎰</div>
+        <div class="stat-icon currencies">{svg_icon("dice", t["chart_yellow"], 20)}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -2349,8 +2384,8 @@ else:
                     f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
                     f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
                     f'<div class="currency-tab-buttons">'
-                    f'<label for="{tab_id}-fiat" class="subtab">💳 Fiat</label>'
-                    f'<label for="{tab_id}-crypto" class="subtab">🪙 Crypto</label>'
+                    f'<label for="{tab_id}-fiat" class="subtab">{svg_icon("card", "currentColor", 14)} Fiat</label>'
+                    f'<label for="{tab_id}-crypto" class="subtab">{svg_icon("crypto", "currentColor", 14)} Crypto</label>'
 
                     f'</div>'
                     f'<div class="fiat-panel">{fiat_html}</div>'
@@ -2366,10 +2401,10 @@ else:
             details_html = (
                 f'<div class="provider-main-tabs">'
                 f'<div class="main-tab-buttons">'
-                f'<button class="main-tab active" data-target="currencies" type="button">💳 Currencies</button>'
-                f'<button class="main-tab" data-target="countries" type="button">🌍 Countries</button>'
-                f'<button class="main-tab" data-target="gamelist" type="button">🎮 Game List</button>'
-                f'<button class="main-tab" data-target="assets" type="button">📁 Assets</button>'
+                f'<button class="main-tab active" data-target="currencies" type="button">{svg_icon("wallet", "currentColor", 14)} Currencies</button>'
+                f'<button class="main-tab" data-target="countries" type="button">{svg_icon("globe", "currentColor", 14)} Countries</button>'
+                f'<button class="main-tab" data-target="gamelist" type="button">{svg_icon("gamepad", "currentColor", 14)} Game List</button>'
+                f'<button class="main-tab" data-target="assets" type="button">{svg_icon("folder", "currentColor", 14)} Assets</button>'
                 f'</div>'
                 f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
                 f'<div class="main-panel countries-panel">{countries_html}</div>'
@@ -2384,7 +2419,7 @@ else:
                 <summary class="card-header">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                         <div style="display: flex; gap: 0.75rem; align-items: center;">
-                            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, {t["bg_hover"]} 0%, {t["bg_secondary"]} 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: {t["primary"]}; font-size: 1.25rem;">🎮</div>
+                            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, {t["bg_hover"]} 0%, {t["bg_secondary"]} 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">{svg_icon("gamepad", t["primary"], 24)}</div>
                             <div>
                                 <div style="font-size: 1rem; font-weight: 600; color: {t["text_primary"]};">{pname}</div>
                                 <div style="font-size: 0.8rem; color: {t["text_secondary"]};">{stats['games']} games</div>
