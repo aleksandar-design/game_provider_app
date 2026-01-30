@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 
 DB_PATH = Path("db") / "database.sqlite"
@@ -203,7 +204,7 @@ st.markdown(
 
       /* Hide default header */
       header[data-testid="stHeader"] {{ display: none; }}
-      .block-container {{ padding-top: 1rem; padding-bottom: 2rem; }}
+      .block-container {{ padding-top: 0; padding-bottom: 2rem; margin-top: 0; }}
 
       /* Custom header - Figma style */
       .logo-container {{
@@ -246,7 +247,7 @@ st.markdown(
       /* Filter container - style bordered containers */
       [data-testid="stVerticalBlockBorderWrapper"] {{
         border-radius: 16px !important;
-        border: 1px solid {t["border"]} !important;
+        border: 1.5px solid {t["border"]} !important;
         background: {t["bg_card"]} !important;
         margin-bottom: 1rem !important;
       }}
@@ -542,6 +543,97 @@ st.markdown(
       }}
       .currency-btn .symbol {{
         font-weight: 600;
+      }}
+
+      /* Currency tabs styling */
+      .currency-tabs {{
+        margin-bottom: 1rem;
+      }}
+      .currency-tabs input[type="radio"] {{
+        display: none;
+      }}
+      .currency-tab-buttons {{
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }}
+      .currency-tabs label.subtab {{
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }}
+      .currency-tabs label.subtab:hover {{
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(59, 130, 246, 0.5);
+      }}
+      .currency-tabs .fiat-panel,
+      .currency-tabs .crypto-panel {{
+        display: none;
+      }}
+      /* When fiat radio is checked */
+      .currency-tabs input[id$="-fiat"]:checked ~ .currency-tab-buttons label[for$="-fiat"] {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
+      }}
+      .currency-tabs input[id$="-fiat"]:checked ~ .fiat-panel {{
+        display: block;
+      }}
+      /* When crypto radio is checked */
+      .currency-tabs input[id$="-crypto"]:checked ~ .currency-tab-buttons label[for$="-crypto"] {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
+      }}
+      .currency-tabs input[id$="-crypto"]:checked ~ .crypto-panel {{
+        display: block;
+      }}
+
+      /* Provider main tabs styling */
+      .provider-main-tabs {{
+        margin-bottom: 1rem;
+      }}
+      .main-tab-buttons {{
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: nowrap;
+      }}
+      .provider-main-tabs .main-tab {{
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }}
+      .provider-main-tabs .main-tab:hover {{
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(59, 130, 246, 0.5);
+      }}
+      .provider-main-tabs .main-panel {{
+        display: none;
+      }}
+      .provider-main-tabs .main-panel.active {{
+        display: block;
+      }}
+      .provider-main-tabs .main-tab.active {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
       }}
 
       /* Expander styling */
@@ -937,6 +1029,46 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Tab toggle handler (client-side)
+components.html(
+    """
+    <script>
+    (function () {
+      // Attach to the Streamlit page (parent), not the iframe
+      const doc = window.parent.document;
+      if (doc.__ttStopPropInit) return;
+      doc.__ttStopPropInit = true;
+
+      function stopIfTabClick(e) {
+        // Currency sub-tabs - explicitly check radio since stopPropagation prevents default
+        const subtab = e.target.closest('.currency-tabs label.subtab');
+        if (subtab) {
+          if (e.type === 'click') {
+            const radioId = subtab.getAttribute('for');
+            if (radioId) {
+              const radio = doc.getElementById(radioId);
+              if (radio) radio.checked = true;
+            }
+          }
+          e.stopPropagation();
+          return;
+        }
+        // Main tabs
+        if (e.target.closest('.provider-main-tabs .main-tab')) {
+          e.stopPropagation();
+        }
+      }
+
+      // Use capture phase so we intercept before <summary> handles it
+      doc.addEventListener('pointerdown', stopIfTabClick, true);
+      doc.addEventListener('click', stopIfTabClick, true);
+    })();
+    </script>
+    """,
+    height=0,
+)
+
 
 # =================================================
 # DB helpers
@@ -2150,56 +2282,101 @@ else:
         target_col = col1 if idx % 2 == 0 else col2
 
         with target_col:
-            # Build details HTML content
-            details_html = ""
+            # Build Countries section HTML
+            countries_html = ""
             # Restricted Countries
             if details["restricted"]:
-                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
+                countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
                 restricted_countries = get_country_info(details["restricted"][:20])
-                details_html += f'<div class="country-tags">'
+                countries_html += f'<div class="country-tags">'
                 for c in restricted_countries:
-                    details_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                    countries_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
                 if len(details["restricted"]) > 20:
-                    details_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
-                details_html += '</div>'
+                    countries_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
+                countries_html += '</div>'
 
             # Regulated Countries
             if details["regulated"]:
-                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
+                countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
                 regulated_countries = get_country_info(details["regulated"][:20])
-                details_html += '<div class="country-tags">'
+                countries_html += '<div class="country-tags">'
                 for c in regulated_countries:
-                    details_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                    countries_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
                 if len(details["regulated"]) > 20:
-                    details_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
-                details_html += '</div>'
+                    countries_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
+                countries_html += '</div>'
 
-            # Supported Currencies
+            # Supported Currencies - build fiat and crypto HTML
+            fiat_html = ""
+            crypto_html = ""
+
+            # Build fiat HTML
             fiat_list = details["currencies"][details["currencies"]["currency_type"] == "FIAT"]["currency_code"].tolist() if not details["currencies"].empty else []
-            if details["currency_mode"] == "ALL_FIAT" or fiat_list:
-                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Currencies</div>'
+            has_fiat = details["currency_mode"] == "ALL_FIAT" or bool(fiat_list)
+            if has_fiat:
+                fiat_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Fiat Currencies</div>'
                 if details["currency_mode"] == "ALL_FIAT":
-                    details_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
+                    fiat_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
                 else:
-                    details_html += '<div class="currency-grid">'
+                    fiat_html += '<div class="currency-grid">'
                     for curr in fiat_list[:9]:
                         symbol = get_currency_symbol(curr)
-                        details_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
-                    details_html += '</div>'
+                        fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
+                    fiat_html += '</div>'
                     if len(fiat_list) > 9:
-                        details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
+                        fiat_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
 
-            # Supported Crypto
+            # Build crypto HTML
             crypto_list = details["currencies"][details["currencies"]["currency_type"] == "CRYPTO"]["currency_code"].tolist() if not details["currencies"].empty else []
-            if crypto_list:
-                details_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Crypto Currencies</div>'
-                details_html += '<div class="currency-grid">'
+            has_crypto = bool(crypto_list)
+            if has_crypto:
+                crypto_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Crypto Currencies</div>'
+                crypto_html += '<div class="currency-grid">'
                 for curr in crypto_list[:9]:
                     symbol = get_currency_symbol(curr)
-                    details_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
-                details_html += '</div>'
+                    crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
+                crypto_html += '</div>'
                 if len(crypto_list) > 9:
-                    details_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
+                    crypto_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
+
+            # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
+            currencies_html = ""
+            if has_fiat and has_crypto:
+                # Generate unique ID for this provider's currency tabs
+                tab_id = f"curr_{pid}"
+                currencies_html = (
+                    f'<div class="currency-tabs">'
+                    f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
+                    f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
+                    f'<div class="currency-tab-buttons">'
+                    f'<label for="{tab_id}-fiat" class="subtab">💳 Fiat</label>'
+                    f'<label for="{tab_id}-crypto" class="subtab">🪙 Crypto</label>'
+
+                    f'</div>'
+                    f'<div class="fiat-panel">{fiat_html}</div>'
+                    f'<div class="crypto-panel">{crypto_html}</div>'
+                    f'</div>'
+                )
+            elif has_fiat:
+                currencies_html = fiat_html
+            elif has_crypto:
+                currencies_html = crypto_html
+
+            # Build top-level tabs wrapper (buttons)
+            details_html = (
+                f'<div class="provider-main-tabs">'
+                f'<div class="main-tab-buttons">'
+                f'<button class="main-tab active" data-target="currencies" type="button">💳 Currencies</button>'
+                f'<button class="main-tab" data-target="countries" type="button">🌍 Countries</button>'
+                f'<button class="main-tab" data-target="gamelist" type="button">🎮 Game List</button>'
+                f'<button class="main-tab" data-target="assets" type="button">📁 Assets</button>'
+                f'</div>'
+                f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
+                f'<div class="main-panel countries-panel">{countries_html}</div>'
+                f'<div class="main-panel gamelist-panel"><p style="color:{t["text_muted"]};">Game list coming soon</p></div>'
+                f'<div class="main-panel assets-panel"><p style="color:{t["text_muted"]};">Assets coming soon</p></div>'
+                f'</div>'
+            )
 
             # Render complete card with details inside - using details/summary as the card wrapper
             st.markdown(f"""

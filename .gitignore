@@ -23,3 +23,6 @@ db/backups/
 logs/
 
 /UI_plan.md
+
+/CLAUDE.md
+/.claude
