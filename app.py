@@ -213,9 +213,39 @@ t = THEMES[current_theme]
 st.markdown(
     f"""
     <style>
+      /* CSS Variables for theming - only these change on theme switch */
+      :root {{
+        --bg-primary: {t["bg_primary"]};
+        --bg-secondary: {t["bg_secondary"]};
+        --bg-card: {t["bg_card"]};
+        --bg-hover: {t["bg_hover"]};
+        --border: {t["border"]};
+        --input-bg: {t["input_bg"]};
+        --text-primary: {t["text_primary"]};
+        --text-secondary: {t["text_secondary"]};
+        --text-muted: {t["text_muted"]};
+        --primary: {t["primary"]};
+        --chart-green: {t["chart_green"]};
+        --chart-yellow: {t["chart_yellow"]};
+        --chart-red: {t["chart_red"]};
+        --tag-restricted-text: {t["tag_restricted_text"]};
+        --tag-regulated-text: {t["tag_regulated_text"]};
+        --shadow: {t["shadow"]};
+      }}
+
+      /* Prevent white flash - set background immediately on all containers */
+      html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main {{
+        background: var(--bg-primary) !important;
+      }}
+
+      /* Smooth theme transitions */
+      .stApp, .stApp *, .stApp *::before, .stApp *::after {{
+        transition: background-color 0.15s ease-out, color 0.1s ease-out, border-color 0.15s ease-out, fill 0.1s ease-out, stroke 0.1s ease-out;
+      }}
+
       /* Main app background */
       .stApp {{
-        background: {t["bg_primary"]};
+        background: var(--bg-primary);
       }}
 
       /* Hide default header */
@@ -854,9 +884,87 @@ st.markdown(
       }}
       .provider-card .card-details-content {{
         padding: 0 1rem 1rem 1rem;
-        border-top: 1px solid {"#D1D5DB" if current_theme == "light" else t["border"]};
+        border-top: 1px solid var(--border);
         margin: 0 1rem;
         padding-top: 0.75rem;
+      }}
+
+      /* Card header layout classes */
+      .card-header-top {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+      }}
+      .card-header-left {{
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }}
+      .provider-icon {{
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-secondary) 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }}
+      .provider-name {{
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }}
+      .provider-games {{
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }}
+      .card-games-section {{
+        margin-top: 0.75rem;
+      }}
+      .games-label {{
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+      }}
+
+      /* Section headers and icons */
+      .section-header {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0.75rem 0;
+      }}
+      .icon-warning {{ color: var(--chart-yellow); }}
+      .icon-regulated {{ color: var(--primary); }}
+      .icon-success {{ color: var(--chart-green); }}
+
+      /* Country tag variants */
+      .country-tag.restricted {{
+        border-color: var(--tag-restricted-text);
+      }}
+      .country-tag.restricted .iso {{
+        background: var(--tag-restricted-text);
+      }}
+      .country-tag.regulated {{
+        border-color: var(--tag-regulated-text);
+      }}
+      .country-tag.regulated .iso {{
+        background: var(--tag-regulated-text);
+      }}
+
+      /* Utility classes */
+      .more-text {{
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+      }}
+      .muted-text {{
+        color: var(--text-muted);
       }}
 
       /* Button styling - Figma style */
@@ -1107,6 +1215,20 @@ components.html(
       // Use capture phase so we intercept before <summary> handles it
       doc.addEventListener('pointerdown', stopIfTabClick, true);
       doc.addEventListener('click', stopIfTabClick, true);
+
+      // Accordion: close other cards when one opens
+      doc.addEventListener('click', function(e) {
+        const summary = e.target.closest('details.provider-card > summary');
+        if (summary) {
+          const card = summary.parentElement;
+          if (!card.open) {
+            // Card is about to open - close all others
+            doc.querySelectorAll('details.provider-card[open]').forEach(function(d) {
+              if (d !== card) d.open = false;
+            });
+          }
+        }
+      }, true);
     })();
     </script>
     """,
@@ -1175,6 +1297,108 @@ def load_crypto_currencies():
             )["currency_code"].tolist()
         except Exception:
             return []
+
+
+@st.cache_data(ttl=60)
+def load_provider_card_data(provider_ids_tuple):
+    """Bulk load all data needed for provider cards. Cached to speed up theme switches."""
+    if not provider_ids_tuple:
+        return {
+            "currency_mode": {},
+            "restricted": {},
+            "regulated": {},
+            "restrictions_count": {},
+            "fiat": {},
+            "crypto": {},
+            "currency_count": {},
+            "games": {},
+            "game_types": {},
+        }
+
+    provider_ids = list(provider_ids_tuple)
+    placeholders = ",".join(["?"] * len(provider_ids))
+
+    # Provider metadata
+    provider_meta_df = qdf(
+        f"SELECT provider_id, currency_mode FROM providers WHERE provider_id IN ({placeholders})",
+        tuple(provider_ids),
+    )
+    currency_mode = dict(zip(provider_meta_df["provider_id"], provider_meta_df["currency_mode"]))
+
+    # Restrictions
+    restrictions_df = qdf(
+        f"SELECT provider_id, country_code, restriction_type FROM restrictions WHERE provider_id IN ({placeholders})",
+        tuple(provider_ids),
+    )
+    restricted = {}
+    regulated = {}
+    restrictions_count = {}
+    if not restrictions_df.empty:
+        for row in restrictions_df.itertuples(index=False):
+            restrictions_count[row.provider_id] = restrictions_count.get(row.provider_id, 0) + 1
+            if row.restriction_type == "REGULATED":
+                regulated.setdefault(row.provider_id, []).append(row.country_code)
+            else:
+                restricted.setdefault(row.provider_id, []).append(row.country_code)
+
+    # Currencies
+    fiat_map = {}
+    crypto_map = {}
+    currency_count = {}
+    try:
+        fiat_df = qdf(
+            f"SELECT provider_id, currency_code FROM fiat_currencies WHERE provider_id IN ({placeholders})",
+            tuple(provider_ids),
+        )
+        crypto_df = qdf(
+            f"SELECT provider_id, currency_code FROM crypto_currencies WHERE provider_id IN ({placeholders})",
+            tuple(provider_ids),
+        )
+        for row in fiat_df.itertuples(index=False):
+            fiat_map.setdefault(row.provider_id, []).append(row.currency_code)
+        for row in crypto_df.itertuples(index=False):
+            crypto_map.setdefault(row.provider_id, []).append(row.currency_code)
+        # Currency count
+        for pid in provider_ids:
+            currency_count[pid] = len(fiat_map.get(pid, [])) + len(crypto_map.get(pid, []))
+    except Exception:
+        pass
+
+    # Games
+    games_map = {}
+    try:
+        games_df = qdf(
+            f"SELECT provider_id, COUNT(*) as games FROM games WHERE provider_id IN ({placeholders}) GROUP BY provider_id",
+            tuple(provider_ids),
+        )
+        games_map = dict(zip(games_df["provider_id"], games_df["games"]))
+    except Exception:
+        pass
+
+    # Game types
+    game_types_map = {}
+    try:
+        game_types_df = qdf(
+            f"SELECT provider_id, LOWER(game_type) as game_type FROM games WHERE provider_id IN ({placeholders}) GROUP BY provider_id, LOWER(game_type)",
+            tuple(provider_ids),
+        )
+        if not game_types_df.empty:
+            for row in game_types_df.itertuples(index=False):
+                game_types_map.setdefault(row.provider_id, []).append(row.game_type or "")
+    except Exception:
+        pass
+
+    return {
+        "currency_mode": currency_mode,
+        "restricted": restricted,
+        "regulated": regulated,
+        "restrictions_count": restrictions_count,
+        "fiat": fiat_map,
+        "crypto": crypto_map,
+        "currency_count": currency_count,
+        "games": games_map,
+        "game_types": game_types_map,
+    }
 
 
 def get_provider_details(pid):
@@ -2161,112 +2385,18 @@ if df.empty:
     st.info("No providers match your filters.")
 else:
     provider_ids = df["ID"].tolist()
-    placeholders = ",".join(["?"] * len(provider_ids))
 
-    # Bulk load provider metadata
-    provider_meta_df = qdf(
-        f"SELECT provider_id, currency_mode FROM providers WHERE provider_id IN ({placeholders})",
-        tuple(provider_ids),
-    )
-    provider_currency_mode = dict(
-        zip(provider_meta_df["provider_id"], provider_meta_df["currency_mode"])
-    )
-
-    # Bulk load restrictions
-    restrictions_df = qdf(
-        f"""
-        SELECT provider_id, country_code, restriction_type
-        FROM restrictions
-        WHERE provider_id IN ({placeholders})
-        """,
-        tuple(provider_ids),
-    )
-    restricted_map = {}
-    regulated_map = {}
-    restrictions_count_map = {}
-    if not restrictions_df.empty:
-        for row in restrictions_df.itertuples(index=False):
-            restrictions_count_map[row.provider_id] = restrictions_count_map.get(row.provider_id, 0) + 1
-            if row.restriction_type == "REGULATED":
-                regulated_map.setdefault(row.provider_id, []).append(row.country_code)
-            else:
-                restricted_map.setdefault(row.provider_id, []).append(row.country_code)
-
-    # Bulk load currencies
-    try:
-        fiat_df = qdf(
-            f"""
-            SELECT provider_id, currency_code, 'FIAT' as currency_type
-            FROM fiat_currencies
-            WHERE provider_id IN ({placeholders})
-            """,
-            tuple(provider_ids),
-        )
-        crypto_df = qdf(
-            f"""
-            SELECT provider_id, currency_code, 'CRYPTO' as currency_type
-            FROM crypto_currencies
-            WHERE provider_id IN ({placeholders})
-            """,
-            tuple(provider_ids),
-        )
-        currencies_df = pd.concat([fiat_df, crypto_df], ignore_index=True)
-    except Exception:
-        currencies_df = qdf(
-            f"""
-            SELECT provider_id, currency_code, currency_type
-            FROM currencies
-            WHERE provider_id IN ({placeholders})
-            """,
-            tuple(provider_ids),
-        )
-    # Pre-build fiat and crypto maps for O(1) lookup (avoid pandas filter per card)
-    fiat_map = {}
-    crypto_map = {}
-    if not currencies_df.empty:
-        for row in currencies_df.itertuples(index=False):
-            if row.currency_type == "FIAT":
-                fiat_map.setdefault(row.provider_id, []).append(row.currency_code)
-            else:
-                crypto_map.setdefault(row.provider_id, []).append(row.currency_code)
-    currency_count_map = (
-        currencies_df.groupby("provider_id").size().to_dict()
-        if not currencies_df.empty
-        else {}
-    )
-
-    # Bulk load games count
-    try:
-        games_df = qdf(
-            f"""
-            SELECT provider_id, COUNT(*) as games
-            FROM games
-            WHERE provider_id IN ({placeholders})
-            GROUP BY provider_id
-            """,
-            tuple(provider_ids),
-        )
-        games_map = dict(zip(games_df["provider_id"], games_df["games"]))
-    except Exception:
-        games_map = {}
-
-    # Bulk load game types per provider
-    game_types_map = {}
-    try:
-        game_types_df = qdf(
-            f"""
-            SELECT provider_id, LOWER(game_type) as game_type
-            FROM games
-            WHERE provider_id IN ({placeholders})
-            GROUP BY provider_id, LOWER(game_type)
-            """,
-            tuple(provider_ids),
-        )
-        if not game_types_df.empty:
-            for row in game_types_df.itertuples(index=False):
-                game_types_map.setdefault(row.provider_id, []).append(row.game_type or "")
-    except Exception:
-        game_types_map = {}
+    # Load all provider card data (cached for fast theme switches)
+    card_data = load_provider_card_data(tuple(provider_ids))
+    provider_currency_mode = card_data["currency_mode"]
+    restricted_map = card_data["restricted"]
+    regulated_map = card_data["regulated"]
+    restrictions_count_map = card_data["restrictions_count"]
+    fiat_map = card_data["fiat"]
+    crypto_map = card_data["crypto"]
+    currency_count_map = card_data["currency_count"]
+    games_map = card_data["games"]
+    game_types_map = card_data["game_types"]
 
     def format_game_type(gt: str) -> str:
         if not gt:
@@ -2303,10 +2433,26 @@ else:
                 result.append({"iso3": iso3, "iso2": iso3[:2], "name": iso3})
         return result
 
+    # Pagination
+    CARDS_PER_PAGE = 24
+    total_providers = len(df)
+    total_pages = max(1, (total_providers + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+
+    if "cards_page" not in st.session_state:
+        st.session_state.cards_page = 0
+    # Reset to page 0 if filters changed and current page is out of bounds
+    if st.session_state.cards_page >= total_pages:
+        st.session_state.cards_page = 0
+
+    current_page = st.session_state.cards_page
+    start_idx = current_page * CARDS_PER_PAGE
+    end_idx = min(start_idx + CARDS_PER_PAGE, total_providers)
+    df_page = df.iloc[start_idx:end_idx]
+
     # Build all cards HTML for CSS Grid
     all_cards_html = []
 
-    for idx, row in df.iterrows():
+    for idx, row in df_page.iterrows():
         pid = row["ID"]
         pname = row["Game Provider"]
 
@@ -2328,22 +2474,22 @@ else:
         countries_html = ""
         # Restricted Countries
         if details["restricted"]:
-            countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_yellow"]};">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
+            countries_html += f'<div class="section-header"><span class="icon-warning">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
             restricted_countries = get_country_info(details["restricted"][:20])
             countries_html += f'<div class="country-tags">'
             for c in restricted_countries:
-                countries_html += f'<span class="country-tag" style="border-color: {t["tag_restricted_text"]};"><span class="iso" style="background: {t["tag_restricted_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                countries_html += f'<span class="country-tag restricted"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
             if len(details["restricted"]) > 20:
                 countries_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
             countries_html += '</div>'
 
         # Regulated Countries
         if details["regulated"]:
-            countries_html += f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["primary"]};">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
+            countries_html += f'<div class="section-header"><span class="icon-regulated">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
             regulated_countries = get_country_info(details["regulated"][:20])
             countries_html += '<div class="country-tags">'
             for c in regulated_countries:
-                countries_html += f'<span class="country-tag" style="border-color: {t["tag_regulated_text"]};"><span class="iso" style="background: {t["tag_regulated_text"]};">{c["iso2"]}</span>{c["name"]}</span>'
+                countries_html += f'<span class="country-tag regulated"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
             if len(details["regulated"]) > 20:
                 countries_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
             countries_html += '</div>'
@@ -2356,7 +2502,7 @@ else:
         fiat_list = fiat_map.get(pid, [])
         has_fiat = details["currency_mode"] == "ALL_FIAT" or bool(fiat_list)
         if has_fiat:
-            fiat_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Fiat Currencies</div>'
+            fiat_html = '<div class="section-header"><span class="icon-success">✓</span> Supported Fiat Currencies</div>'
             if details["currency_mode"] == "ALL_FIAT":
                 fiat_html += '<div class="currency-grid"><div class="currency-btn fiat"><span class="symbol">*</span>All FIAT</div></div>'
             else:
@@ -2366,20 +2512,20 @@ else:
                     fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
                 fiat_html += '</div>'
                 if len(fiat_list) > 9:
-                    fiat_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(fiat_list) - 9} more</div>'
+                    fiat_html += f'<div class="more-text">+{len(fiat_list) - 9} more</div>'
 
         # Build crypto HTML
         crypto_list = crypto_map.get(pid, [])
         has_crypto = bool(crypto_list)
         if has_crypto:
-            crypto_html = f'<div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: {t["text_primary"]}; margin: 0.75rem 0;"><span style="color: {t["chart_green"]};">✓</span> Supported Crypto Currencies</div>'
+            crypto_html = '<div class="section-header"><span class="icon-success">✓</span> Supported Crypto Currencies</div>'
             crypto_html += '<div class="currency-grid">'
             for curr in crypto_list[:9]:
                 symbol = get_currency_symbol(curr)
                 crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
             crypto_html += '</div>'
             if len(crypto_list) > 9:
-                crypto_html += f'<div style="font-size: 0.75rem; color: {t["text_muted"]}; margin-top: 0.25rem;">+{len(crypto_list) - 9} more</div>'
+                crypto_html += f'<div class="more-text">+{len(crypto_list) - 9} more</div>'
 
         # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
         currencies_html = ""
@@ -2414,17 +2560,39 @@ else:
             f'</div>'
             f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
             f'<div class="main-panel countries-panel">{countries_html}</div>'
-            f'<div class="main-panel gamelist-panel"><p style="color:{t["text_muted"]};">Game list coming soon</p></div>'
-            f'<div class="main-panel assets-panel"><p style="color:{t["text_muted"]};">Assets coming soon</p></div>'
+            f'<div class="main-panel gamelist-panel"><p class="muted-text">Game list coming soon</p></div>'
+            f'<div class="main-panel assets-panel"><p class="muted-text">Assets coming soon</p></div>'
             f'</div>'
         )
 
         # Build card HTML
-        card_html = f'''<details class="provider-card"><summary class="card-header"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;"><div style="display:flex;gap:0.75rem;align-items:center;"><div style="width:48px;height:48px;background:linear-gradient(135deg,{t["bg_hover"]} 0%,{t["bg_secondary"]} 100%);border-radius:12px;display:flex;align-items:center;justify-content:center;">{svg_icon("gamepad", t["primary"], 24)}</div><div><div style="font-size:1rem;font-weight:600;color:{t["text_primary"]};">{pname}</div><div style="font-size:0.8rem;color:{t["text_secondary"]};">{stats['games']} games</div></div></div><span class="expand-icon">▼</span></div><div style="margin-top:0.75rem;"><div style="font-size:0.75rem;color:{t["text_secondary"]};margin-bottom:0.5rem;font-weight:600;">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></summary><div class="card-details-content">{details_html if details_html else '<p style="color:' + t["text_muted"] + ';">No details available</p>'}</div></details>'''
+        card_html = f'''<details class="provider-card"><summary class="card-header"><div class="card-header-top"><div class="card-header-left"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 24)}</div><div><div class="provider-name">{pname}</div><div class="provider-games">{stats['games']} games</div></div></div><span class="expand-icon">▼</span></div><div class="card-games-section"><div class="games-label">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
         all_cards_html.append(card_html)
 
     # Render all cards in grid container
     st.markdown(f'<div class="provider-cards">{"".join(all_cards_html)}</div>', unsafe_allow_html=True)
+
+    # Pagination controls
+    if total_pages > 1:
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+        pag_col1, pag_col2, pag_col3 = st.columns([1, 2, 1])
+        with pag_col1:
+            if current_page > 0:
+                if st.button("← Previous", key="btn_prev_page"):
+                    st.session_state.cards_page = current_page - 1
+                    st.rerun()
+        with pag_col2:
+            st.markdown(
+                f'<div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 0.5rem;">'
+                f'Page {current_page + 1} of {total_pages} ({start_idx + 1}-{end_idx} of {total_providers})'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with pag_col3:
+            if current_page < total_pages - 1:
+                if st.button("Next →", key="btn_next_page"):
+                    st.session_state.cards_page = current_page + 1
+                    st.rerun()
 
 # =================================================
 # Admin: AI Agent — Import provider from Excel
