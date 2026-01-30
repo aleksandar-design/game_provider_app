@@ -250,7 +250,30 @@ st.markdown(
 
       /* Hide default header */
       header[data-testid="stHeader"] {{ display: none; }}
-      .block-container {{ padding-top: 0; padding-bottom: 2rem; margin-top: 0; }}
+      .block-container {{ padding-top: 4rem; padding-bottom: 2rem; margin-top: 0; }}
+
+      /* Sticky header */
+      .st-key-sticky_header {{
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 999 !important;
+        background: {t["bg_primary"]} !important;
+        padding: 0.5rem 1rem !important;
+        border-bottom: 1px solid {t["border"]} !important;
+        overflow: visible !important;
+      }}
+      .st-key-sticky_header [data-testid="stVerticalBlock"] {{
+        gap: 0 !important;
+        overflow: visible !important;
+      }}
+      .st-key-sticky_header [data-testid="stHorizontalBlock"] {{
+        overflow: visible !important;
+      }}
+      .st-key-sticky_header [data-testid="stHorizontalBlock"] > div {{
+        overflow: visible !important;
+      }}
 
       /* Custom header - Figma style */
       .logo-container {{
@@ -669,9 +692,9 @@ st.markdown(
         text-align: center;
         padding: 0.5rem 1rem;
         border-radius: 0.5rem;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.6);
+        background: {t["bg_card"]};
+        border: 1px solid {t["border"]};
+        color: {t["text_secondary"]};
         font-size: 0.875rem;
         font-weight: 600;
         cursor: pointer;
@@ -685,7 +708,7 @@ st.markdown(
         flex-shrink: 0;
       }}
       .provider-main-tabs .main-tab:hover {{
-        background: rgba(255, 255, 255, 0.08);
+        background: {t["bg_hover"]};
         border-color: rgba(59, 130, 246, 0.5);
       }}
       .provider-main-tabs .main-panel {{
@@ -1177,6 +1200,153 @@ st.markdown(
 
       /* Hide sidebar toggle */
       button[data-testid="baseButton-headerNoPadding"] {{ display: none; }}
+
+      /* ===========================================
+         BUTTON TEXT WRAPPING FIXES (all screen sizes)
+         =========================================== */
+      /* Logout button - always prevent wrapping */
+      .st-key-btn_logout button {{
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }}
+      /* Export button - always prevent wrapping */
+      .st-key-btn_export_excel button {{
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        min-width: max-content !important;
+      }}
+
+      /* ===========================================
+         TABLET RESPONSIVE (1100px and below)
+         =========================================== */
+      @media (max-width: 1100px) {{
+        /* Logout button - show just arrow */
+        .st-key-btn_logout button {{
+          font-size: 0 !important;
+          padding: 0.4rem 0.6rem !important;
+        }}
+        .st-key-btn_logout button::after {{
+          content: "→" !important;
+          font-size: 1rem !important;
+        }}
+        /* Export button more compact */
+        .st-key-btn_export_excel button {{
+          font-size: 0.75rem !important;
+          padding: 0.4rem 0.6rem !important;
+        }}
+        /* Provider cards - single column on tablets */
+        .provider-cards {{
+          grid-template-columns: 1fr !important;
+        }}
+      }}
+
+      /* ===========================================
+         MOBILE RESPONSIVE STYLES
+         =========================================== */
+      @media (max-width: 768px) {{
+        /* Header: compact on mobile */
+        .st-key-sticky_header {{
+          padding: 0.5rem 0.75rem !important;
+        }}
+        .st-key-sticky_header img {{
+          height: 32px !important;
+        }}
+        .st-key-sticky_header .stButton > button {{
+          padding: 0.25rem 0.5rem !important;
+          min-width: auto !important;
+        }}
+
+        /* Filter container - full width */
+        .block-container {{
+          padding-left: 0.75rem !important;
+          padding-right: 0.75rem !important;
+        }}
+
+        /* Filter columns stack on mobile */
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"] {{
+          flex-direction: column !important;
+          gap: 0.5rem !important;
+        }}
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"] > div {{
+          width: 100% !important;
+          flex: 1 1 100% !important;
+        }}
+
+        /* Stats cards - stack vertically */
+        .stats-container {{
+          flex-direction: column !important;
+          gap: 0.75rem !important;
+        }}
+
+        /* Provider title row - stack */
+        div[data-testid="stHorizontalBlock"]:has(.providers-title) {{
+          flex-direction: column !important;
+          gap: 0.5rem !important;
+          align-items: flex-start !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.providers-title) > div {{
+          width: 100% !important;
+          flex: 1 1 100% !important;
+        }}
+        .providers-title {{
+          font-size: 1.1rem !important;
+        }}
+
+        /* Provider cards - single column grid */
+        .provider-cards {{
+          grid-template-columns: 1fr !important;
+        }}
+
+        /* Provider card details - smaller text */
+        .provider-card .tag {{
+          font-size: 0.65rem !important;
+          padding: 0.2rem 0.4rem !important;
+        }}
+        .currency-grid {{
+          grid-template-columns: repeat(3, 1fr) !important;
+          gap: 0.25rem !important;
+        }}
+        .country-grid {{
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 0.25rem !important;
+        }}
+
+        /* Main tab buttons smaller */
+        .provider-main-tabs .main-tab {{
+          font-size: 0.75rem !important;
+          padding: 0.4rem 0.75rem !important;
+        }}
+
+        /* Mode toggle buttons */
+        .st-key-filter_mode_supported button,
+        .st-key-filter_mode_restricted button {{
+          font-size: 0.75rem !important;
+          padding: 0.4rem 0.75rem !important;
+        }}
+      }}
+
+      /* Extra small screens (phones in portrait) */
+      @media (max-width: 480px) {{
+        .st-key-sticky_header {{
+          padding: 0.4rem 0.5rem !important;
+        }}
+        .st-key-sticky_header img {{
+          height: 28px !important;
+        }}
+        /* Hide theme text, show only icon */
+        .st-key-btn_theme button {{
+          padding: 0.25rem !important;
+          min-width: 32px !important;
+        }}
+        .currency-grid {{
+          grid-template-columns: repeat(2, 1fr) !important;
+        }}
+        .country-grid {{
+          grid-template-columns: 1fr !important;
+        }}
+      }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -2038,29 +2208,27 @@ else:
 # No additional CSS needed - the spacer column handles alignment
 
 # Header with columns - logo left, spacer grows to push buttons right
-logo_col, spacer, buttons_col = st.columns([2, 12, 1.5])
+with st.container(key="sticky_header"):
+    logo_col, spacer, buttons_col = st.columns([2, 12, 1.5])
 
-with logo_col:
-    st.markdown(logo_html, unsafe_allow_html=True)
+    with logo_col:
+        st.markdown(logo_html, unsafe_allow_html=True)
 
-with buttons_col:
-    theme_btn, logout_btn = st.columns([1, 2], gap="small")
-    with theme_btn:
-        def toggle_theme():
-            new_theme = "light" if get_theme() == "dark" else "dark"
-            set_theme(new_theme)
-        # Moon icon for current dark mode, sun for light mode
-        theme_icon = "☀" if current_theme == "dark" else "☾"
-        st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
-    with logout_btn:
-        if st.button("→ Logout", key="btn_logout"):
-            st.session_state["is_admin"] = False
-            if "session" in st.query_params:
-                del st.query_params["session"]
-            st.rerun()
-
-# Header divider
-st.markdown(f'<div style="border-bottom: 1px solid {t["border"]}; margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
+    with buttons_col:
+        theme_btn, logout_btn = st.columns([1, 2], gap="small")
+        with theme_btn:
+            def toggle_theme():
+                new_theme = "light" if get_theme() == "dark" else "dark"
+                set_theme(new_theme)
+            # Moon icon for current dark mode, sun for light mode
+            theme_icon = "☀" if current_theme == "dark" else "☾"
+            st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
+        with logout_btn:
+            if st.button("→ Logout", key="btn_logout"):
+                st.session_state["is_admin"] = False
+                if "session" in st.query_params:
+                    del st.query_params["session"]
+                st.rerun()
 
 # =================================================
 # Filters (match mock layout)
