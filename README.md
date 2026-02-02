@@ -26,7 +26,8 @@ A Streamlit web application for managing game provider data, including country r
 - **Export to Excel**: Download filtered results as Excel file
 - **Admin Panel**: AI-assisted import of provider data from Excel files
 - **Google Sheets Sync**: Automatic import from Google Drive folder
-- **Three-tier Restrictions**: Distinguishes BLOCKED, CONDITIONAL, and REGULATED countries
+- **Two-tier Restrictions**: Distinguishes RESTRICTED (blocked/conditional) and REGULATED countries
+- **API Sync**: Sync game catalogs from external API with provider name mapping
 - **Separate Currency Tables**: FIAT and Crypto currencies stored in separate tables
 - **Database Backups**: Automatic backups before each sync
 - **Persistent Login**: "Keep me signed in" option to stay logged in across page refreshes
@@ -57,12 +58,15 @@ A Streamlit web application for managing game provider data, including country r
 game_provider_app/
 ├── app.py                  # Main Streamlit application
 ├── db_init.py              # Database schema initialization
-├── google_sync.py          # Google Sheets sync script (NEW)
+├── google_sync.py          # Google Sheets sync script
+├── api_sync.py             # API sync for game catalogs
 ├── importer.py             # Batch import from Excel via config.csv
 ├── create_countries.py     # Populate countries table (basic list)
 ├── create_full_countries.py # Populate countries table (full ISO list)
 ├── generate_config.py      # Auto-generate config.csv from Excel files
 ├── inspect_xlsx.py         # Debug tool to inspect Excel structure
+├── migrate_games_table.py  # Migration: add games table columns
+├── migrate_restriction_types.py # Migration: consolidate restriction types
 ├── config.csv              # Configuration for batch import
 ├── requirements.txt        # Python dependencies
 ├── service_account.json    # Google service account key (not in git)
@@ -77,6 +81,7 @@ game_provider_app/
 │   ├── database.sqlite     # Main database (production)
 │   ├── staging.sqlite      # Staging database (safe import target)
 │   └── backups/            # Automatic database backups
+├── logs/                   # API sync logs (timestamped)
 └── data_sources/           # Excel files for import (.xlsx)
 ```
 
@@ -102,7 +107,7 @@ The app uses SQLite with the following tables:
 |--------|------|-------------|
 | provider_id | INTEGER | Foreign key to providers |
 | country_code | TEXT | ISO3 country code (e.g., USA, GBR) |
-| restriction_type | TEXT | **BLOCKED** (fully blocked), **CONDITIONAL** (can open with docs), or **REGULATED** (requires license) |
+| restriction_type | TEXT | **RESTRICTED** (blocked or conditional) or **REGULATED** (requires license) |
 | source | TEXT | Import source identifier |
 
 ### `fiat_currencies`
@@ -161,6 +166,24 @@ Audit log for tracking changes (timestamp, action, details).
 | ts | TEXT | Backup timestamp |
 | filename | TEXT | Backup filename |
 | size_bytes | INTEGER | File size |
+
+### `games`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| provider_id | INTEGER | Foreign key to providers |
+| game_id | INTEGER | External API game ID |
+| title | TEXT | Game title |
+| platform | TEXT | desktop-and-mobile, etc. |
+| game_type | TEXT | slots, live, etc. |
+| rtp | REAL | Return-to-player percentage |
+| volatility | TEXT | Volatility level |
+| features | TEXT | JSON array of features |
+| themes | TEXT | JSON array of themes |
+| tags | TEXT | JSON array of tags |
+| thumbnail | TEXT | Thumbnail image URL |
+| api_provider | TEXT | Original API provider name |
+| source | TEXT | Import source identifier |
 
 ---
 
@@ -269,7 +292,7 @@ The project includes a `.devcontainer` configuration. Opening in VS Code with th
 
 ## Importing Data
 
-There are three ways to import provider data:
+There are four ways to import provider data:
 
 ### Method 1: Admin UI (AI-Assisted)
 
@@ -408,12 +431,39 @@ Google Drive: "Providers Data"
 
 Each sheet should have tabs like:
 - **Restricted countries** - with sections:
-  - "Blocked Countries" → fully blocked
-  - "Restricted Countries" → conditional (can open with docs)
-  - "Regulated Countries" → requires license
+  - "Blocked Countries" → maps to RESTRICTED
+  - "Restricted Countries" → maps to RESTRICTED
+  - "Regulated Countries" → maps to REGULATED
 - **Supported currencies** - with sections:
   - FIAT currencies (e.g., USD, EUR, GBP)
   - Crypto currencies (e.g., BTC, ETH, USDT)
+
+### Method 4: API Sync
+
+Sync game catalogs from an external API.
+
+#### Configure
+
+Add to `.streamlit/secrets.toml`:
+```toml
+API_BASE_URL = "https://api.example.com"
+X_OPERATOR_ID = "your_operator_id"
+X_AUTHORIZATION = "your_auth_key"
+```
+
+#### Run Sync
+
+```bash
+python api_sync.py
+```
+
+Or use the "Sync from API" button in the admin panel.
+
+Features:
+- **Provider name mapping** - Maps API provider names to DB providers (e.g., "Pragmatic Play Slots" → "Pragmatic Play")
+- **Game metadata** - Imports RTP, volatility, features, themes, tags, thumbnails
+- **Incremental sync** - Only updates games with `source='api_sync'`, preserving manual entries
+- **Logging** - Detailed logs saved to `logs/` directory
 
 ---
 
@@ -470,11 +520,14 @@ Note: The app's custom CSS handles theming dynamically, so the config.toml serve
 | `app.py` | Main Streamlit application | `streamlit run app.py` |
 | `db_init.py` | Create database schema | `python db_init.py` |
 | `google_sync.py` | Sync from Google Sheets | `python google_sync.py` / `--list` / `--restore` |
+| `api_sync.py` | Sync games from external API | `python api_sync.py` |
 | `importer.py` | Batch import from config.csv | `python importer.py` |
 | `create_countries.py` | Add basic country list | `python create_countries.py` |
 | `create_full_countries.py` | Add full ISO country list | `python create_full_countries.py` |
 | `generate_config.py` | Auto-generate config from Excel | `python generate_config.py` |
 | `inspect_xlsx.py` | Debug: inspect Excel structure | `python inspect_xlsx.py` |
+| `migrate_games_table.py` | Migration: add games table columns | `python migrate_games_table.py` |
+| `migrate_restriction_types.py` | Migration: consolidate restriction types | `python migrate_restriction_types.py` |
 
 ---
 

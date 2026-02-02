@@ -274,6 +274,10 @@ st.markdown(
       .st-key-sticky_header [data-testid="stHorizontalBlock"] > div {{
         overflow: visible !important;
       }}
+      /* Override Streamlit's max-width on header logo */
+      .st-key-sticky_header img {{
+        max-width: none !important;
+      }}
 
       /* Custom header - Figma style */
       .logo-container {{
@@ -290,8 +294,9 @@ st.markdown(
         justify-content: center;
       }}
       .logo-icon img {{
-        width: 100%;
-        height: 100%;
+        width: auto;
+        height: 44px;
+        max-width: none !important;
         object-fit: contain;
       }}
       .logo-text {{
@@ -315,6 +320,14 @@ st.markdown(
       /* Tighter gap for header buttons */
       [data-testid="stHorizontalBlock"]:has(.st-key-btn_theme) {{
         gap: 0.25rem !important;
+      }}
+      /* Header buttons - override Streamlit's direction="column" */
+      div.stVerticalBlock.st-key-header_buttons[direction="column"] {{
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
       }}
 
       /* Filter container - style bordered containers */
@@ -1246,18 +1259,6 @@ st.markdown(
          MOBILE RESPONSIVE STYLES
          =========================================== */
       @media (max-width: 768px) {{
-        /* Header: compact on mobile */
-        .st-key-sticky_header {{
-          padding: 0.5rem 0.75rem !important;
-        }}
-        .st-key-sticky_header img {{
-          height: 32px !important;
-        }}
-        .st-key-sticky_header .stButton > button {{
-          padding: 0.25rem 0.5rem !important;
-          min-width: auto !important;
-        }}
-
         /* Filter container - full width */
         .block-container {{
           padding-left: 0.75rem !important;
@@ -1280,20 +1281,6 @@ st.markdown(
           gap: 0.75rem !important;
         }}
 
-        /* Provider title row - stack */
-        div[data-testid="stHorizontalBlock"]:has(.providers-title) {{
-          flex-direction: column !important;
-          gap: 0.5rem !important;
-          align-items: flex-start !important;
-        }}
-        div[data-testid="stHorizontalBlock"]:has(.providers-title) > div {{
-          width: 100% !important;
-          flex: 1 1 100% !important;
-        }}
-        .providers-title {{
-          font-size: 1.1rem !important;
-        }}
-
         /* Provider cards - single column grid */
         .provider-cards {{
           grid-template-columns: 1fr !important;
@@ -1306,11 +1293,9 @@ st.markdown(
         }}
         .currency-grid {{
           grid-template-columns: repeat(3, 1fr) !important;
-          gap: 0.25rem !important;
         }}
         .country-grid {{
           grid-template-columns: repeat(2, 1fr) !important;
-          gap: 0.25rem !important;
         }}
 
         /* Main tab buttons smaller */
@@ -1318,28 +1303,79 @@ st.markdown(
           font-size: 0.75rem !important;
           padding: 0.4rem 0.75rem !important;
         }}
+      }}
 
-        /* Mode toggle buttons */
-        .st-key-filter_mode_supported button,
-        .st-key-filter_mode_restricted button {{
-          font-size: 0.75rem !important;
+      /* ===========================================
+         MOBILE HEADER FIX - 2 rows: centered logo, then buttons
+         =========================================== */
+      @media (max-width: 640px) {{
+        .st-key-sticky_header {{
+          padding: 0.5rem !important;
+        }}
+
+        /* Stack main header columns into rows */
+        .st-key-sticky_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
+          flex-wrap: wrap !important;
+          gap: 0.5rem !important;
+          justify-content: center !important;
+        }}
+        /* Logo column - full width, centered */
+        .st-key-sticky_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:first-child {{
+          width: 100% !important;
+          flex: 0 0 100% !important;
+          display: flex !important;
+          justify-content: center !important;
+        }}
+        /* Spacer column - hide it */
+        .st-key-sticky_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {{
+          display: none !important;
+        }}
+        /* Buttons column - full width, centered */
+        .st-key-sticky_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:last-child {{
+          width: 100% !important;
+          flex: 0 0 100% !important;
+          display: flex !important;
+          justify-content: center !important;
+        }}
+
+        /* Center the logo container and its content */
+        .st-key-sticky_header .logo-container {{
+          justify-content: center !important;
+          width: 100% !important;
+        }}
+        .st-key-sticky_header [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stMarkdownContainer"],
+        .st-key-sticky_header [data-testid="stHorizontalBlock"] > div:first-child {{
+          display: flex !important;
+          justify-content: center !important;
+          width: 100% !important;
+          text-align: center !important;
+        }}
+
+        /* Header buttons - center on mobile with spacing */
+        div.stVerticalBlock.st-key-header_buttons[direction="column"] {{
+          justify-content: center !important;
+          margin-top: 0.5rem !important;
+        }}
+        /* Button styling */
+        .st-key-btn_theme button {{
           padding: 0.4rem 0.75rem !important;
+          min-width: auto !important;
+          white-space: nowrap !important;
+        }}
+        /* Reset logout button - show original text, remove tablet ::after */
+        .st-key-btn_logout button {{
+          font-size: 0.8rem !important;
+          padding: 0.4rem 0.75rem !important;
+          min-width: auto !important;
+          white-space: nowrap !important;
+        }}
+        .st-key-btn_logout button::after {{
+          content: none !important;
         }}
       }}
 
-      /* Extra small screens (phones in portrait) */
-      @media (max-width: 480px) {{
-        .st-key-sticky_header {{
-          padding: 0.4rem 0.5rem !important;
-        }}
-        .st-key-sticky_header img {{
-          height: 28px !important;
-        }}
-        /* Hide theme text, show only icon */
-        .st-key-btn_theme button {{
-          padding: 0.25rem !important;
-          min-width: 32px !important;
-        }}
+      /* Extra small screens */
+      @media (max-width: 420px) {{
         .currency-grid {{
           grid-template-columns: repeat(2, 1fr) !important;
         }}
@@ -2205,25 +2241,24 @@ else:
     </div>'''
 
 # Note: Header buttons use column ratios [2, 12, 0.5, 1] to push buttons right
-# No additional CSS needed - the spacer column handles alignment
-
 # Header with columns - logo left, spacer grows to push buttons right
 with st.container(key="sticky_header"):
-    logo_col, spacer, buttons_col = st.columns([2, 12, 1.5])
+    logo_col, spacer, buttons_col = st.columns([2, 8, 2])
 
     with logo_col:
         st.markdown(logo_html, unsafe_allow_html=True)
 
+    # spacer is empty - just pushes buttons right
+
     with buttons_col:
-        theme_btn, logout_btn = st.columns([1, 2], gap="small")
-        with theme_btn:
+        # Use container with key for CSS targeting - buttons inside will be inline via CSS
+        with st.container(key="header_buttons"):
             def toggle_theme():
                 new_theme = "light" if get_theme() == "dark" else "dark"
                 set_theme(new_theme)
             # Moon icon for current dark mode, sun for light mode
             theme_icon = "☀" if current_theme == "dark" else "☾"
             st.button(theme_icon, key="btn_theme", help="Toggle theme", on_click=toggle_theme)
-        with logout_btn:
             if st.button("→ Logout", key="btn_logout"):
                 st.session_state["is_admin"] = False
                 if "session" in st.query_params:
