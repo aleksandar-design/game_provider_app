@@ -789,7 +789,7 @@ st.markdown(
         display: block;
       }}
 
-      /* Country type sub-tabs - same pattern as currency tabs */
+      /* Country type sub-tabs - match main tab styling */
       .country-type-tabs {{
         margin-top: 0.5rem;
       }}
@@ -802,18 +802,25 @@ st.markdown(
         margin-bottom: 1rem;
       }}
       .country-type-tabs .subtab {{
-        padding: 0.375rem 0.75rem;
-        border-radius: 0.375rem;
-        background: {t["bg_secondary"]};
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background: {t["bg_card"]};
         border: 1px solid {t["border"]};
         color: {t["text_secondary"]};
-        font-size: 0.75rem;
-        font-weight: 500;
+        font-size: 0.875rem;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
       }}
       .country-type-tabs .subtab:hover {{
         background: {t["bg_hover"]};
+        border-color: rgba(59, 130, 246, 0.5);
       }}
       .country-type-tabs .restricted-panel,
       .country-type-tabs .regulated-panel {{
@@ -1111,7 +1118,8 @@ st.markdown(
 
       /* Game List Modal - larger size */
       .modal-content.modal-lg {{
-        max-width: 800px;
+        max-width: 1000px;
+        width: 95%;
         max-height: 85vh;
       }}
 
@@ -1255,17 +1263,25 @@ st.markdown(
         font-weight: 600;
         line-height: 1;
       }}
-      .volatility-badge.high {{
-        background: rgba(239, 68, 68, 0.2);
-        color: #EF4444;
+      .volatility-badge.low {{
+        background: rgba(34, 197, 94, 0.2);
+        color: #22C55E;
+      }}
+      .volatility-badge.medium-low {{
+        background: rgba(132, 204, 22, 0.2);
+        color: #84CC16;
       }}
       .volatility-badge.medium {{
         background: rgba(245, 158, 11, 0.2);
         color: #F59E0B;
       }}
-      .volatility-badge.low {{
-        background: rgba(34, 197, 94, 0.2);
-        color: #22C55E;
+      .volatility-badge.medium-high {{
+        background: rgba(249, 115, 22, 0.2);
+        color: #F97316;
+      }}
+      .volatility-badge.high {{
+        background: rgba(239, 68, 68, 0.2);
+        color: #EF4444;
       }}
 
       /* Feature tags */
@@ -2107,13 +2123,25 @@ components.html(
         }
       });
 
+      // Helper: switch back to currencies tab when closing games modal
+      function switchToCurrenciesTab(modalId) {
+        if (modalId && modalId.startsWith('games-modal-')) {
+          const pid = modalId.replace('games-modal-', '');
+          const currenciesRadio = doc.getElementById('main_' + pid + '-currencies');
+          if (currenciesRadio) currenciesRadio.checked = true;
+        }
+      }
+
       // Modal close (X button)
       doc.addEventListener('click', function(e) {
         const closeBtn = e.target.closest('[data-close-modal]');
         if (closeBtn) {
           const modalId = closeBtn.getAttribute('data-close-modal');
           const modal = doc.getElementById(modalId);
-          if (modal) modal.classList.remove('open');
+          if (modal) {
+            modal.classList.remove('open');
+            switchToCurrenciesTab(modalId);
+          }
           e.stopPropagation();
         }
       });
@@ -2122,6 +2150,7 @@ components.html(
       doc.addEventListener('click', function(e) {
         if (e.target.classList.contains('modal-overlay')) {
           e.target.classList.remove('open');
+          switchToCurrenciesTab(e.target.id);
         }
       });
 
@@ -2130,6 +2159,7 @@ components.html(
         if (e.key === 'Escape') {
           doc.querySelectorAll('.modal-overlay.open').forEach(function(m) {
             m.classList.remove('open');
+            switchToCurrenciesTab(m.id);
           });
         }
       });
@@ -2202,20 +2232,38 @@ components.html(
         return gamesDataCache || [];
       }
 
-      // Convert volatility value to label
+      // Convert volatility value to display label
       function getVolatilityLabel(vol) {
         if (!vol && vol !== 0) return '';
-        var v = parseFloat(vol);
-        if (!isNaN(v)) {
-          if (v < 2.5) return 'Low';
-          if (v < 3.5) return 'Medium';
-          return 'High';
-        }
-        var vs = String(vol).toLowerCase();
-        if (vs === 'low' || vs === 'l') return 'Low';
-        if (vs === 'medium' || vs === 'med' || vs === 'm') return 'Medium';
-        if (vs === 'high' || vs === 'h') return 'High';
-        return vs.charAt(0).toUpperCase() + vs.slice(1);
+        var vs = String(vol).trim();
+        // Handle numeric values 1-5
+        var labelMap = {'1': 'Low', '2': 'Medium Low', '3': 'Medium', '4': 'Medium High', '5': 'High'};
+        if (labelMap[vs]) return labelMap[vs];
+        // Handle string values
+        var vl = vs.toLowerCase();
+        if (vl.includes('medium') && vl.includes('low')) return 'Medium Low';
+        if (vl.includes('medium') && vl.includes('high')) return 'Medium High';
+        if (vl === 'low' || vl === 'l') return 'Low';
+        if (vl === 'medium' || vl === 'med' || vl === 'm') return 'Medium';
+        if (vl === 'high' || vl === 'h') return 'High';
+        return vs;
+      }
+
+      // Normalize volatility for CSS class
+      function normalizeVolatilityClass(vol) {
+        if (!vol) return '';
+        var vs = String(vol).trim();
+        // Handle numeric values 1-5
+        var classMap = {'1': 'low', '2': 'medium-low', '3': 'medium', '4': 'medium-high', '5': 'high'};
+        if (classMap[vs]) return classMap[vs];
+        // Handle string values
+        var vl = vs.toLowerCase();
+        if (vl.includes('medium') && vl.includes('low')) return 'medium-low';
+        if (vl.includes('medium') && vl.includes('high')) return 'medium-high';
+        if (vl === 'low' || vl === 'l') return 'low';
+        if (vl === 'medium' || vl === 'med' || vl === 'm') return 'medium';
+        if (vl === 'high' || vl === 'h') return 'high';
+        return '';
       }
 
       // Parse JSON field (themes/features)
@@ -2236,8 +2284,7 @@ components.html(
         var rtp = game.rtp;
         var rtpDisplay = rtp ? rtp.toFixed(2) : 'N/A';
         var volatility = getVolatilityLabel(game.volatility);
-        var volClass = volatility.toLowerCase();
-        if (volClass !== 'low' && volClass !== 'medium' && volClass !== 'high') volClass = '';
+        var volClass = normalizeVolatilityClass(game.volatility);
         var themes = parseJsonField(game.themes);
         var theme = themes[0] || '';
         var features = parseJsonField(game.features);
@@ -3890,7 +3937,9 @@ else:
           <select class="game-filter-volatility" data-modal="{pid}">
             <option value="">All Volatility</option>
             <option value="low">Low</option>
+            <option value="medium-low">Medium Low</option>
             <option value="medium">Medium</option>
+            <option value="medium-high">Medium High</option>
             <option value="high">High</option>
           </select>
         </div>
