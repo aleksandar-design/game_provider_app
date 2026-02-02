@@ -226,6 +226,8 @@ def svg_icon(name: str, color: str = "currentColor", size: int = 16) -> str:
         "check-circle": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>',
         "alert-triangle": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
         "info": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+        "filter": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
+        "chevron-down": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
     }
     return icons.get(name, "")
 
@@ -901,7 +903,7 @@ st.markdown(
         right: 0;
         bottom: 0;
         background: rgba(0, 0, 0, 0.7);
-        z-index: 1000;
+        z-index: 10000;
         justify-content: center;
         align-items: center;
       }}
@@ -1162,6 +1164,60 @@ st.markdown(
         border-color: var(--primary);
       }}
 
+      /* Collapsible filter wrapper - desktop: always show content */
+      .games-filter-collapse {{
+        display: block;
+      }}
+      .games-filter-collapse > summary {{
+        display: none;
+      }}
+      .games-filter-collapse > summary::-webkit-details-marker {{
+        display: none;
+      }}
+      /* Force content visible on desktop regardless of open state */
+      .games-filter-collapse > .games-filter-bar {{
+        display: block !important;
+      }}
+      .filter-toggle {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }}
+      .filter-chevron {{
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-left: auto;
+      }}
+      .games-filter-collapse[open] .filter-chevron {{
+        transform: rotate(180deg);
+      }}
+
+      /* Animation keyframes for filter bar */
+      @keyframes filterSlideDown {{
+        from {{
+          opacity: 0;
+          transform: translateY(-10px);
+        }}
+        to {{
+          opacity: 1;
+          transform: translateY(0);
+        }}
+      }}
+      @keyframes filterSlideUp {{
+        from {{
+          opacity: 1;
+          transform: translateY(0);
+        }}
+        to {{
+          opacity: 0;
+          transform: translateY(-10px);
+        }}
+      }}
+
+      /* Apply button - hidden on desktop */
+      .filter-apply-btn {{
+        display: none;
+      }}
+
       /* Games list */
       .games-list {{
         padding: 1rem 1.5rem;
@@ -1361,9 +1417,67 @@ st.markdown(
           font-size: 0.65rem;
           padding: 0.15rem 0.35rem;
         }}
-        /* Hide features on mobile to save space */
+        /* Show features on mobile (compact) */
         .game-features {{
-          display: none;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.25rem;
+          margin-top: 0.5rem;
+        }}
+        .feature-tag {{
+          font-size: 0.65rem;
+          padding: 0.2rem 0.4rem;
+        }}
+        /* Collapsible filter on mobile */
+        .games-filter-collapse {{
+          display: block;
+          border-bottom: 1px solid var(--border);
+        }}
+        .games-filter-collapse > summary {{
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.9rem;
+          color: var(--text-primary);
+          list-style: none;
+          background: var(--bg-secondary);
+          transition: background 0.2s;
+        }}
+        .games-filter-collapse > summary:active {{
+          background: var(--bg-hover);
+        }}
+        .games-filter-collapse[open] > summary {{
+          border-bottom: 1px solid var(--border);
+        }}
+        /* Override desktop forced visibility - hide when closed on mobile */
+        .games-filter-collapse > .games-filter-bar {{
+          display: none !important;
+        }}
+        .games-filter-collapse[open] > .games-filter-bar {{
+          display: block !important;
+          padding: 0.75rem 1rem 1rem;
+          background: var(--bg-secondary);
+        }}
+        .filter-apply-btn {{
+          display: block !important;
+          width: 100%;
+          margin-top: 1rem;
+          padding: 0.75rem 1rem;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }}
+        .filter-apply-btn:active {{
+          transform: scale(0.98);
+          opacity: 0.9;
         }}
       }}
 
@@ -2445,6 +2559,16 @@ components.html(
             e.target.classList.contains('game-filter-theme')) {
           const modalId = e.target.getAttribute('data-modal');
           filterGames(modalId);
+        }
+      });
+
+      // Apply filter button (mobile) - closes filter panel
+      doc.addEventListener('click', function(e) {
+        if (e.target.classList.contains('filter-apply-btn')) {
+          const modalId = e.target.getAttribute('data-modal');
+          filterGames(modalId);
+          const details = e.target.closest('details.games-filter-collapse');
+          if (details) details.removeAttribute('open');
         }
       });
 
@@ -3942,40 +4066,47 @@ else:
       <span class="modal-count">{game_count} games</span>
       <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
     </div>
-    <div class="games-filter-bar">
-      <div class="filter-row">
-        <div class="filter-group">
-          <label>Search by Name</label>
-          <input type="text" class="game-search" placeholder="Search games..." data-modal="{pid}">
+    <details class="games-filter-collapse">
+      <summary>
+        <span class="filter-toggle">{svg_icon("filter", "currentColor", 16)} Filter Games</span>
+        <span class="filter-chevron">{svg_icon("chevron-down", "currentColor", 16)}</span>
+      </summary>
+      <div class="games-filter-bar">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Search by Name</label>
+            <input type="text" class="game-search" placeholder="Search games..." data-modal="{pid}">
+          </div>
+          <div class="filter-group">
+            <label>RTP Range</label>
+            <select class="game-filter-rtp" data-modal="{pid}">
+              <option value="">All RTP</option>
+              <option value="95-96">95% - 96%</option>
+              <option value="96-97">96% - 97%</option>
+              <option value="97+">97%+</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Volatility</label>
+            <select class="game-filter-volatility" data-modal="{pid}">
+              <option value="">All Volatility</option>
+              <option value="low">Low</option>
+              <option value="medium-low">Medium Low</option>
+              <option value="medium">Medium</option>
+              <option value="medium-high">Medium High</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Theme</label>
+            <select class="game-filter-theme" data-modal="{pid}">
+              <option value="">All Themes</option>
+            </select>
+          </div>
         </div>
-        <div class="filter-group">
-          <label>RTP Range</label>
-          <select class="game-filter-rtp" data-modal="{pid}">
-            <option value="">All RTP</option>
-            <option value="95-96">95% - 96%</option>
-            <option value="96-97">96% - 97%</option>
-            <option value="97+">97%+</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>Volatility</label>
-          <select class="game-filter-volatility" data-modal="{pid}">
-            <option value="">All Volatility</option>
-            <option value="low">Low</option>
-            <option value="medium-low">Medium Low</option>
-            <option value="medium">Medium</option>
-            <option value="medium-high">Medium High</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>Theme</label>
-          <select class="game-filter-theme" data-modal="{pid}">
-            <option value="">All Themes</option>
-          </select>
-        </div>
+        <button class="filter-apply-btn" data-modal="{pid}">Apply Filters</button>
       </div>
-    </div>
+    </details>
     <div class="games-list" id="games-list-{pid}">
       <div class="games-loading">Loading games...</div>
     </div>
