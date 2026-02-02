@@ -894,6 +894,40 @@ st.markdown(
         flex-shrink: 0;
       }}
 
+      /* Export button - small inline download link */
+      .export-btn {{
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #3B82F6;
+        border: 1px solid #3B82F6;
+        border-radius: 6px;
+        color: #FFFFFF !important;
+        cursor: pointer;
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+      }}
+      .export-btn:hover {{
+        background: #2563EB;
+        border-color: #2563EB;
+      }}
+      .export-btn::before {{
+        content: "↓ ";
+      }}
+      /* Panel header with title and export button */
+      .panel-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }}
+      .panel-header .section-header {{
+        margin-bottom: 0;
+      }}
+
       /* Modal overlay */
       .modal-overlay {{
         display: none;
@@ -927,8 +961,8 @@ st.markdown(
       /* Modal header */
       .modal-header {{
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        gap: 0.75rem;
         padding: 1rem 1.5rem;
         border-bottom: 1px solid var(--border);
       }}
@@ -936,6 +970,14 @@ st.markdown(
         margin: 0;
         color: var(--text-primary);
         font-size: 1.1rem;
+        flex: 1;
+      }}
+      .modal-header .modal-count {{
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }}
+      .modal-header .export-btn {{
+        margin-left: 0;
       }}
       .modal-close {{
         background: none;
@@ -945,6 +987,7 @@ st.markdown(
         cursor: pointer;
         padding: 0;
         line-height: 1;
+        margin-left: 0.5rem;
       }}
       .modal-close:hover {{
         color: var(--text-primary);
@@ -2890,6 +2933,35 @@ def get_currency_name(code: str) -> str:
         return ""
 
 
+def create_csv_data_url(headers: list[str], rows: list[list[str]], filename: str) -> tuple[str, str]:
+    """Generate a base64-encoded CSV data URL for Excel download.
+    Uses semicolon separator which Excel recognizes universally.
+    Returns tuple of (data_url, filename) for use in <a> href and download attributes.
+    """
+    import base64
+
+    def escape_cell(cell):
+        # Escape quotes and wrap in quotes if contains separator or quotes
+        val = str(cell).replace('"', '""')
+        if ';' in val or '"' in val or '\n' in val:
+            return f'"{val}"'
+        return val
+
+    # Build CSV with semicolon separator (works universally)
+    lines = []
+    lines.append(';'.join(escape_cell(h) for h in headers))
+    for row in rows:
+        lines.append(';'.join(escape_cell(c) for c in row))
+    content = '\r\n'.join(lines)
+
+    # UTF-8 with BOM for Excel
+    file_bytes = ('\ufeff' + content).encode('utf-8')
+    b64 = base64.b64encode(file_bytes).decode('ascii')
+
+    safe_filename = filename.replace(' ', '_').replace('"', '').replace("'", '')
+    return f"data:text/csv;base64,{b64}", f"{safe_filename}.csv"
+
+
 def upsert_provider_by_name(provider_name: str, currency_mode: str) -> int:
     with db() as con:
         cur = con.execute("SELECT provider_id FROM providers WHERE provider_name=?", (provider_name,))
@@ -3891,11 +3963,31 @@ else:
         # Build countries section with sub-tabs if both types exist
         countries_html = ""
         countries_modal_html = ""
+        countries_export_btn = ""
         total_countries = len(details["restricted"]) + len(details["regulated"])
+
+        # Generate countries export CSV data
+        if has_restricted or has_regulated:
+            country_rows = []
+            all_restricted_info = get_country_info(details["restricted"])
+            all_regulated_info = get_country_info(details["regulated"])
+            for c in all_restricted_info:
+                country_rows.append([c["iso3"], c["name"], "Restricted"])
+            for c in all_regulated_info:
+                country_rows.append([c["iso3"], c["name"], "Regulated"])
+
+            if country_rows:
+                csv_url, csv_filename = create_csv_data_url(
+                    ["Country Code (ISO3)", "Country Name", "Restriction Type"],
+                    country_rows,
+                    f"{pname}_countries"
+                )
+                countries_export_btn = f'<a href="{csv_url}" download="{csv_filename}" class="export-btn">Export to Excel</a>'
 
         if has_restricted and has_regulated:
             country_tab_id = f"country_{pid}"
             countries_html = (
+                f'<div class="panel-header"><span></span>{countries_export_btn}</div>'
                 f'<div class="country-type-tabs">'
                 f'<input type="radio" id="{country_tab_id}-restricted" name="{country_tab_id}" checked>'
                 f'<input type="radio" id="{country_tab_id}-regulated" name="{country_tab_id}">'
@@ -3908,9 +4000,9 @@ else:
                 f'</div>'
             )
         elif has_restricted:
-            countries_html = restricted_html
+            countries_html = f'<div class="panel-header"><span></span>{countries_export_btn}</div>{restricted_html}'
         elif has_regulated:
-            countries_html = regulated_html
+            countries_html = f'<div class="panel-header"><span></span>{countries_export_btn}</div>{regulated_html}'
         else:
             countries_html = '<p class="muted-text">No country restrictions</p>'
 
@@ -3980,6 +4072,8 @@ else:
   <div class="modal-content">
     <div class="modal-header">
       <h3>Countries - {pname}</h3>
+      <span class="modal-count">{total_countries} countries</span>
+      {countries_export_btn}
       <button class="modal-close" data-close-modal="countries-modal-{pid}">&times;</button>
     </div>
     <div class="modal-search">
@@ -4028,6 +4122,25 @@ else:
                 crypto_html += f'<div class="currency-btn crypto more-toggle" data-modal="currencies-modal-{pid}">+{len(crypto_list) - 9} more</div>'
             crypto_html += '</div>'
 
+        # Generate currencies export CSV data (used for both modal and panel)
+        currencies_export_btn = ""
+        if has_fiat or has_crypto:
+            currency_rows = []
+            for curr in fiat_list:
+                symbol = get_currency_symbol(curr)
+                currency_rows.append([curr, "Fiat", symbol])
+            for curr in crypto_list:
+                symbol = get_currency_symbol(curr)
+                currency_rows.append([curr, "Crypto", symbol])
+
+            if currency_rows:
+                csv_url, csv_filename = create_csv_data_url(
+                    ["Currency Code", "Type", "Symbol"],
+                    currency_rows,
+                    f"{pname}_currencies"
+                )
+                currencies_export_btn = f'<a href="{csv_url}" download="{csv_filename}" class="export-btn">Export to Excel</a>'
+
         # Build currencies modal if there are more than 9 of either type
         if (len(fiat_list) > 9 or len(crypto_list) > 9) and details["currency_mode"] != "ALL_FIAT":
             total_currencies = len(fiat_list) + len(crypto_list)
@@ -4072,6 +4185,7 @@ else:
     <div class="modal-header">
       <h3>Currencies - {pname}</h3>
       <span class="modal-count">{total_currencies} currencies</span>
+      {currencies_export_btn}
       <button class="modal-close" data-close-modal="currencies-modal-{pid}">&times;</button>
     </div>
     <div class="modal-search">
@@ -4085,11 +4199,55 @@ else:
 
         # Build Games modal (empty shell - content loaded via JS on open)
         game_count = int(games_map.get(pid, 0))
+        games_export_btn = ""
+
+        # Generate games export CSV data if there are games
+        if game_count > 0:
+            try:
+                games_export_df = qdf(
+                    "SELECT title, rtp, volatility, themes, features FROM games WHERE provider_id=? ORDER BY title",
+                    (pid,),
+                )
+                if not games_export_df.empty:
+                    game_rows = []
+                    for _, g in games_export_df.iterrows():
+                        # Parse themes and features (stored as JSON arrays)
+                        themes_str = ""
+                        features_str = ""
+                        try:
+                            import json as json_module
+                            themes_list = json_module.loads(g["themes"]) if g["themes"] else []
+                            features_list = json_module.loads(g["features"]) if g["features"] else []
+                            themes_str = ", ".join(themes_list) if themes_list else ""
+                            features_str = ", ".join(features_list) if features_list else ""
+                        except Exception:
+                            themes_str = str(g["themes"]) if g["themes"] else ""
+                            features_str = str(g["features"]) if g["features"] else ""
+
+                        rtp_val = f"{g['rtp']}%" if g["rtp"] else ""
+                        game_rows.append([
+                            g["title"] or "",
+                            rtp_val,
+                            g["volatility"] or "",
+                            themes_str,
+                            features_str
+                        ])
+
+                    csv_url, csv_filename = create_csv_data_url(
+                        ["Game Title", "RTP", "Volatility", "Themes", "Features"],
+                        game_rows,
+                        f"{pname}_games"
+                    )
+                    games_export_btn = f'<a href="{csv_url}" download="{csv_filename}" class="export-btn">Export to Excel</a>'
+            except Exception:
+                pass  # Skip export if games query fails
+
         games_modal_html = f'''<div class="modal-overlay" id="games-modal-{pid}" data-provider-id="{pid}" data-provider-name="{pname}">
   <div class="modal-content modal-lg">
     <div class="modal-header">
       <h3>Game List - {pname}</h3>
       <span class="modal-count">{game_count} games</span>
+      {games_export_btn}
       <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
     </div>
     <details class="games-filter-collapse" open>
@@ -4151,6 +4309,7 @@ else:
             # Generate unique ID for this provider's currency tabs
             tab_id = f"curr_{pid}"
             currencies_html = (
+                f'<div class="panel-header"><span></span>{currencies_export_btn}</div>'
                 f'<div class="currency-tabs">'
                 f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
                 f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
@@ -4163,9 +4322,9 @@ else:
                 f'</div>'
             )
         elif has_fiat:
-            currencies_html = fiat_html
+            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{fiat_html}'
         elif has_crypto:
-            currencies_html = crypto_html
+            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{crypto_html}'
 
         # Build top-level tabs wrapper (pure CSS radio pattern)
         main_tab_id = f"main_{pid}"
