@@ -17,6 +17,39 @@ from openai import OpenAI
 DB_PATH = Path("db") / "database.sqlite"
 
 # =================================================
+# Games data loader (early for components.html injection)
+# =================================================
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def load_all_games_json():
+    """Load all games data as JSON for client-side lazy loading."""
+    if not DB_PATH.exists():
+        return "[]"
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT provider_id, game_id, title, rtp, volatility, themes, features, thumbnail
+            FROM games
+            ORDER BY provider_id, title
+        """)
+        rows = cursor.fetchall()
+        games_records = []
+        for row in rows:
+            games_records.append({
+                "provider_id": row[0],
+                "game_id": row[1],
+                "title": row[2] or "",
+                "rtp": row[3],
+                "volatility": row[4] or "",
+                "themes": row[5] or "[]",
+                "features": row[6] or "[]",
+                "thumbnail": row[7] or "",
+            })
+        return json.dumps(games_records)
+    finally:
+        conn.close()
+
+# =================================================
 # Auth helpers (defined early for session restoration)
 # =================================================
 def get_admin_password():
@@ -1076,6 +1109,223 @@ st.markdown(
         margin-right: 1rem;
       }}
 
+      /* Game List Modal - larger size */
+      .modal-content.modal-lg {{
+        max-width: 800px;
+        max-height: 85vh;
+      }}
+
+      /* Games filter bar */
+      .games-filter-bar {{
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-secondary);
+      }}
+      .filter-row {{
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }}
+      .filter-group {{
+        flex: 1;
+        min-width: 150px;
+      }}
+      .filter-group label {{
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+        font-weight: 600;
+      }}
+      .filter-group input,
+      .filter-group select {{
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        box-sizing: border-box;
+      }}
+      .filter-group input:focus,
+      .filter-group select:focus {{
+        outline: none;
+        border-color: var(--primary);
+      }}
+
+      /* Games list */
+      .games-list {{
+        padding: 1rem 1.5rem;
+        overflow-y: auto;
+        max-height: calc(85vh - 200px);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }}
+
+      /* Game card */
+      .game-card {{
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        transition: all 0.2s;
+      }}
+      .game-card:hover {{
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px var(--shadow);
+      }}
+      .game-card.hidden {{
+        display: none !important;
+      }}
+
+      /* Thumbnail - portrait ratio to match 440x590 images */
+      .game-thumbnail {{
+        width: 64px;
+        height: 86px;
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        overflow: hidden;
+      }}
+      .game-thumbnail img {{
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }}
+      .game-thumbnail .placeholder-icon {{
+        color: var(--text-muted);
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-secondary);
+      }}
+
+      /* Game info */
+      .game-info {{
+        flex: 1;
+        min-width: 0;
+      }}
+      .game-title {{
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+      }}
+
+      /* Game meta row */
+      .game-meta {{
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+      }}
+      .game-meta-item {{
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+      }}
+      .meta-label {{
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }}
+      .meta-value {{
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }}
+
+      /* Volatility badges */
+      .volatility-badge {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1;
+      }}
+      .volatility-badge.high {{
+        background: rgba(239, 68, 68, 0.2);
+        color: #EF4444;
+      }}
+      .volatility-badge.medium {{
+        background: rgba(245, 158, 11, 0.2);
+        color: #F59E0B;
+      }}
+      .volatility-badge.low {{
+        background: rgba(34, 197, 94, 0.2);
+        color: #22C55E;
+      }}
+
+      /* Feature tags */
+      .game-features {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+      }}
+      .feature-tag {{
+        padding: 0.25rem 0.5rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+      }}
+
+      /* Game list empty state */
+      .games-empty {{
+        text-align: center;
+        padding: 3rem 1.5rem;
+        color: var(--text-muted);
+      }}
+      .games-empty svg {{
+        margin-bottom: 1rem;
+        opacity: 0.5;
+      }}
+
+      /* Game list loading state */
+      .games-loading {{
+        text-align: center;
+        padding: 3rem 1.5rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }}
+
+      /* Mobile responsive for games modal */
+      @media (max-width: 640px) {{
+        .modal-content.modal-lg {{
+          max-width: 100%;
+          margin: 0.5rem;
+        }}
+        .filter-row {{
+          flex-direction: column;
+        }}
+        .filter-group {{
+          min-width: 100%;
+        }}
+        .game-card {{
+          flex-direction: column;
+        }}
+        .game-thumbnail {{
+          width: 100%;
+          height: 200px;
+        }}
+        .game-meta {{
+          gap: 1rem;
+        }}
+      }}
+
       /* Expander styling */
       [data-testid="stExpander"] {{
         border: none !important;
@@ -1751,6 +2001,8 @@ st.markdown(
 )
 
 # Tab toggle handler (client-side)
+# Load games data for injection into JavaScript
+_games_json_data = load_all_games_json()
 components.html(
     """
     <script>
@@ -1797,6 +2049,20 @@ components.html(
             if (radioId) {
               const radio = doc.getElementById(radioId);
               if (radio) radio.checked = true;
+
+              // Open games modal when clicking Game List tab
+              if (radioId.includes('-gamelist')) {
+                const pid = radioId.replace('main_', '').replace('-gamelist', '');
+                const modal = doc.getElementById('games-modal-' + pid);
+                if (modal) {
+                  populateGamesModal(modal, pid);
+                  modal.classList.add('open');
+                  const searchInput = modal.querySelector('.game-search');
+                  if (searchInput) {
+                    setTimeout(function() { searchInput.focus(); }, 100);
+                  }
+                }
+              }
             }
           }
           e.stopPropagation();
@@ -1926,9 +2192,203 @@ components.html(
           e.stopPropagation();
         }
       }, true);
+
+      // Placeholder SVG for missing thumbnails
+      var placeholderSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>';
+
+      // Games data injected directly from Python
+      var gamesDataCache = __GAMES_JSON_PLACEHOLDER__;
+      function getGamesData() {
+        return gamesDataCache || [];
+      }
+
+      // Convert volatility value to label
+      function getVolatilityLabel(vol) {
+        if (!vol && vol !== 0) return '';
+        var v = parseFloat(vol);
+        if (!isNaN(v)) {
+          if (v < 2.5) return 'Low';
+          if (v < 3.5) return 'Medium';
+          return 'High';
+        }
+        var vs = String(vol).toLowerCase();
+        if (vs === 'low' || vs === 'l') return 'Low';
+        if (vs === 'medium' || vs === 'med' || vs === 'm') return 'Medium';
+        if (vs === 'high' || vs === 'h') return 'High';
+        return vs.charAt(0).toUpperCase() + vs.slice(1);
+      }
+
+      // Parse JSON field (themes/features)
+      function parseJsonField(val) {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        try {
+          var parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch(e) {
+          return [];
+        }
+      }
+
+      // Build a single game card HTML
+      function buildGameCard(game) {
+        var title = game.title || '';
+        var rtp = game.rtp;
+        var rtpDisplay = rtp ? rtp.toFixed(2) : 'N/A';
+        var volatility = getVolatilityLabel(game.volatility);
+        var volClass = volatility.toLowerCase();
+        if (volClass !== 'low' && volClass !== 'medium' && volClass !== 'high') volClass = '';
+        var themes = parseJsonField(game.themes);
+        var theme = themes[0] || '';
+        var features = parseJsonField(game.features);
+        var thumbnail = game.thumbnail || '';
+
+        var thumbHtml = thumbnail
+          ? '<img src="' + thumbnail + '" alt="' + title + '" class="game-thumb-img"><div class="placeholder-icon" style="display:none;">' + placeholderSvg + '</div>'
+          : '<div class="placeholder-icon">' + placeholderSvg + '</div>';
+
+        var featureTags = features.slice(0, 5).map(function(f) {
+          return '<span class="feature-tag">' + f + '</span>';
+        }).join('');
+        if (features.length > 5) {
+          featureTags += '<span class="feature-tag">+' + (features.length - 5) + ' more</span>';
+        }
+
+        return '<div class="game-card" data-title="' + title.toLowerCase() + '" data-rtp="' + (rtp || 0) + '" data-volatility="' + volClass + '" data-theme="' + theme.toLowerCase() + '">' +
+          '<div class="game-thumbnail">' + thumbHtml + '</div>' +
+          '<div class="game-info">' +
+            '<div class="game-title">' + title + '</div>' +
+            '<div class="game-meta">' +
+              '<div class="game-meta-item"><span class="meta-label">RTP</span><span class="meta-value">' + rtpDisplay + '%</span></div>' +
+              '<div class="game-meta-item"><span class="meta-label">Volatility</span><span class="volatility-badge ' + volClass + '">' + (volatility || 'N/A') + '</span></div>' +
+              '<div class="game-meta-item"><span class="meta-label">Theme</span><span class="meta-value">' + (theme || 'N/A') + '</span></div>' +
+              '<div class="game-meta-item"><span class="meta-label">Features</span><span class="meta-value">' + features.length + ' features</span></div>' +
+            '</div>' +
+            '<div class="game-features">' + featureTags + '</div>' +
+          '</div>' +
+        '</div>';
+      }
+
+      // Populate games modal content on open
+      function populateGamesModal(modal, pid) {
+        var gamesList = modal.querySelector('.games-list');
+        if (!gamesList) return;
+
+        // Skip if already populated
+        if (gamesList.getAttribute('data-loaded') === 'true') return;
+
+        var allGames = getGamesData();
+        var pidNum = parseInt(pid, 10);
+        var providerGames = allGames.filter(function(g) {
+          return g.provider_id === pidNum || g.provider_id === pid || String(g.provider_id) === String(pid);
+        });
+        console.log('Provider', pid, '- found', providerGames.length, 'games out of', allGames.length, 'total');
+
+        if (providerGames.length === 0) {
+          gamesList.innerHTML = '<div class="games-empty">' + placeholderSvg + '<p>No games available</p></div>';
+          gamesList.setAttribute('data-loaded', 'true');
+          return;
+        }
+
+        // Build game cards
+        var cardsHtml = providerGames.map(buildGameCard).join('');
+        gamesList.innerHTML = cardsHtml;
+        gamesList.setAttribute('data-loaded', 'true');
+
+        // Update count
+        var countEl = modal.querySelector('.modal-count');
+        if (countEl) countEl.textContent = providerGames.length + ' games';
+
+        // Populate theme dropdown with unique themes
+        var themes = {};
+        providerGames.forEach(function(g) {
+          var t = parseJsonField(g.themes);
+          if (t[0]) themes[t[0]] = true;
+        });
+        var sortedThemes = Object.keys(themes).sort();
+        var themeSelect = modal.querySelector('.game-filter-theme');
+        if (themeSelect) {
+          themeSelect.innerHTML = '<option value="">All Themes</option>' +
+            sortedThemes.map(function(t) {
+              return '<option value="' + t.toLowerCase() + '">' + t + '</option>';
+            }).join('');
+        }
+      }
+
+      // Game filters function
+      function filterGames(modalId) {
+        const modal = doc.getElementById('games-modal-' + modalId);
+        if (!modal) return;
+
+        const searchVal = (modal.querySelector('.game-search')?.value || '').toLowerCase();
+        const rtpVal = modal.querySelector('.game-filter-rtp')?.value || '';
+        const volVal = modal.querySelector('.game-filter-volatility')?.value || '';
+        const themeVal = (modal.querySelector('.game-filter-theme')?.value || '').toLowerCase();
+
+        modal.querySelectorAll('.game-card').forEach(function(card) {
+          const title = card.getAttribute('data-title') || '';
+          const rtp = parseFloat(card.getAttribute('data-rtp')) || 0;
+          const volatility = card.getAttribute('data-volatility') || '';
+          const theme = card.getAttribute('data-theme') || '';
+
+          var show = true;
+
+          // Search filter
+          if (searchVal && !title.includes(searchVal)) show = false;
+
+          // RTP filter
+          if (rtpVal) {
+            if (rtpVal === '95-96' && (rtp < 95 || rtp >= 96)) show = false;
+            if (rtpVal === '96-97' && (rtp < 96 || rtp >= 97)) show = false;
+            if (rtpVal === '97+' && rtp < 97) show = false;
+          }
+
+          // Volatility filter
+          if (volVal && volatility !== volVal) show = false;
+
+          // Theme filter
+          if (themeVal && theme !== themeVal) show = false;
+
+          card.classList.toggle('hidden', !show);
+        });
+
+        // Update visible count
+        const visibleCount = modal.querySelectorAll('.game-card:not(.hidden)').length;
+        const countEl = modal.querySelector('.modal-count');
+        if (countEl) countEl.textContent = visibleCount + ' games';
+      }
+
+      // Game search filter
+      doc.addEventListener('input', function(e) {
+        if (e.target.classList.contains('game-search')) {
+          const modalId = e.target.getAttribute('data-modal');
+          filterGames(modalId);
+        }
+      });
+
+      // Game dropdown filters
+      doc.addEventListener('change', function(e) {
+        if (e.target.classList.contains('game-filter-rtp') ||
+            e.target.classList.contains('game-filter-volatility') ||
+            e.target.classList.contains('game-filter-theme')) {
+          const modalId = e.target.getAttribute('data-modal');
+          filterGames(modalId);
+        }
+      });
+
+      // Handle broken images - show placeholder (capture phase for img errors)
+      doc.addEventListener('error', function(e) {
+        if (e.target.classList && e.target.classList.contains('game-thumb-img')) {
+          e.target.style.display = 'none';
+          const placeholder = e.target.nextElementSibling;
+          if (placeholder && placeholder.classList.contains('placeholder-icon')) {
+            placeholder.style.display = 'flex';
+          }
+        }
+      }, true);
     })();
     </script>
-    """,
+    """.replace("__GAMES_JSON_PLACEHOLDER__", _games_json_data),
     height=0,
 )
 
@@ -2084,6 +2544,8 @@ def load_provider_card_data(provider_ids_tuple):
                 game_types_map.setdefault(row.provider_id, []).append(row.game_type or "")
     except Exception:
         pass
+
+    # Note: Full game details are now loaded globally via JSON for lazy-loading in JS
 
     return {
         "currency_mode": currency_mode,
@@ -3399,6 +3861,59 @@ else:
   </div>
 </div>'''
 
+        # Build Games modal (empty shell - content loaded via JS on open)
+        game_count = int(games_map.get(pid, 0))
+        games_modal_html = f'''<div class="modal-overlay" id="games-modal-{pid}" data-provider-id="{pid}" data-provider-name="{pname}">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h3>Game List - {pname}</h3>
+      <span class="modal-count">{game_count} games</span>
+      <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
+    </div>
+    <div class="games-filter-bar">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Search by Name</label>
+          <input type="text" class="game-search" placeholder="Search games..." data-modal="{pid}">
+        </div>
+        <div class="filter-group">
+          <label>RTP Range</label>
+          <select class="game-filter-rtp" data-modal="{pid}">
+            <option value="">All RTP</option>
+            <option value="95-96">95% - 96%</option>
+            <option value="96-97">96% - 97%</option>
+            <option value="97+">97%+</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Volatility</label>
+          <select class="game-filter-volatility" data-modal="{pid}">
+            <option value="">All Volatility</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Theme</label>
+          <select class="game-filter-theme" data-modal="{pid}">
+            <option value="">All Themes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="games-list" id="games-list-{pid}">
+      <div class="games-loading">Loading games...</div>
+    </div>
+  </div>
+</div>'''
+
+        # Build gamelist panel content
+        if game_count > 0:
+            gamelist_panel_content = f'<p class="muted-text">Click to view {game_count} games</p>'
+        else:
+            gamelist_panel_content = f'<div class="games-empty">{svg_icon("gamepad", "var(--text-muted)", 48)}<p>No games available</p></div>'
+
         # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
         currencies_html = ""
         if has_fiat and has_crypto:
@@ -3437,7 +3952,7 @@ else:
             f'</div>'
             f'<div class="main-panel currencies-panel">{currencies_html}</div>'
             f'<div class="main-panel countries-panel">{countries_html}</div>'
-            f'<div class="main-panel gamelist-panel"><p class="muted-text">Game list coming soon</p></div>'
+            f'<div class="main-panel gamelist-panel">{gamelist_panel_content}</div>'
             f'<div class="main-panel assets-panel"><p class="muted-text">Assets coming soon</p></div>'
             f'</div>'
         )
@@ -3449,6 +3964,8 @@ else:
             card_html += countries_modal_html
         if currencies_modal_html:
             card_html += currencies_modal_html
+        if games_modal_html:
+            card_html += games_modal_html
         all_cards_html.append(card_html)
 
     # Render all cards in grid container

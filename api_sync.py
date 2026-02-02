@@ -332,8 +332,8 @@ def replace_games_for_provider(provider_id: int, games: list[dict], source: str 
         for g in games:
             details = g.get("details", {})
             thumbnails = details.get("thumbnails", {})
-            # Pick a main thumbnail (prefer 440x590)
-            thumbnail = thumbnails.get("440x590") or thumbnails.get("300x300") or next(iter(thumbnails.values()), None) if thumbnails else None
+            # Pick a main thumbnail (prefer JPG version, then 440x590)
+            thumbnail = thumbnails.get("440x590-jpg") or thumbnails.get("440x590") or thumbnails.get("300x300") or next(iter(thumbnails.values()), None) if thumbnails else None
 
             title = g.get("title") or "Unknown"
             con.execute(
