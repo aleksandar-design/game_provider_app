@@ -2043,10 +2043,27 @@ st.markdown(
           grid-template-columns: repeat(2, 1fr) !important;
         }}
 
-        /* Main tab buttons smaller */
+        /* Main tabs wrap to 2 rows */
+        .main-tab-buttons {{
+          flex-wrap: wrap !important;
+          gap: 0.5rem !important;
+        }}
         .provider-main-tabs .main-tab {{
+          flex: 0 0 calc(50% - 0.25rem) !important;
+          min-width: calc(50% - 0.25rem) !important;
+          font-size: 0.7rem !important;
+          padding: 0.4rem 0.5rem !important;
+        }}
+
+        /* Currency sub-tabs also wrap if needed */
+        .currency-tab-buttons {{
+          flex-wrap: wrap !important;
+          gap: 0.5rem !important;
+        }}
+        .currency-tabs label.subtab {{
+          flex: 0 0 calc(50% - 0.25rem) !important;
+          min-width: calc(50% - 0.25rem) !important;
           font-size: 0.75rem !important;
-          padding: 0.4rem 0.75rem !important;
         }}
       }}
 
