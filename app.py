@@ -2229,6 +2229,15 @@ components.html(
                 if (modal) {
                   populateGamesModal(modal, pid);
                   modal.classList.add('open');
+                  // On mobile, collapse filter by default
+                  const filterDetails = modal.querySelector('.games-filter-collapse');
+                  if (filterDetails) {
+                    if (window.innerWidth <= 640) {
+                      filterDetails.removeAttribute('open');
+                    } else {
+                      filterDetails.setAttribute('open', '');
+                    }
+                  }
                   const searchInput = modal.querySelector('.game-search');
                   if (searchInput) {
                     setTimeout(function() { searchInput.focus(); }, 100);
@@ -4083,7 +4092,7 @@ else:
       <span class="modal-count">{game_count} games</span>
       <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
     </div>
-    <details class="games-filter-collapse">
+    <details class="games-filter-collapse" open>
       <summary>
         <span class="filter-toggle">{svg_icon("filter", "currentColor", 16)} Filter Games</span>
         <span class="filter-chevron">{svg_icon("chevron-down", "currentColor", 16)}</span>
