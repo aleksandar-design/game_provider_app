@@ -1118,7 +1118,7 @@ st.markdown(
 
       /* Game List Modal - larger size */
       .modal-content.modal-lg {{
-        max-width: 1000px;
+        max-width: 1700px;
         width: 95%;
         max-height: 85vh;
       }}
@@ -1330,15 +1330,40 @@ st.markdown(
         .filter-group {{
           min-width: 100%;
         }}
+        /* Keep horizontal layout on mobile */
         .game-card {{
-          flex-direction: column;
+          flex-direction: row;
+          gap: 0.75rem;
+          padding: 0.75rem;
         }}
+        /* Smaller thumbnail on mobile */
         .game-thumbnail {{
-          width: 100%;
-          height: 200px;
+          width: 50px;
+          height: 67px;
+          flex-shrink: 0;
+        }}
+        .game-title {{
+          font-size: 0.9rem;
         }}
         .game-meta {{
-          gap: 1rem;
+          gap: 0.5rem;
+        }}
+        .game-meta-item {{
+          min-width: 0;
+        }}
+        .meta-label {{
+          font-size: 0.65rem;
+        }}
+        .meta-value {{
+          font-size: 0.75rem;
+        }}
+        .volatility-badge {{
+          font-size: 0.65rem;
+          padding: 0.15rem 0.35rem;
+        }}
+        /* Hide features on mobile to save space */
+        .game-features {{
+          display: none;
         }}
       }}
 
