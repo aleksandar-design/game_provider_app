@@ -944,19 +944,29 @@ st.markdown(
         gap: 0.5rem;
         margin-bottom: 1rem;
       }}
-      .modal-tabs .subtab {{
-        padding: 0.375rem 0.75rem;
-        border-radius: 0.375rem;
-        background: {t["bg_secondary"]};
-        border: 1px solid {t["border"]};
-        color: {t["text_secondary"]};
-        font-size: 0.75rem;
-        font-weight: 500;
+      .modal-tab-buttons label.subtab {{
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
       }}
-      .modal-tabs .subtab:hover {{
-        background: {t["bg_hover"]};
+      .modal-tab-buttons label.subtab:hover {{
+        background: var(--bg-hover);
+        border-color: rgba(59, 130, 246, 0.5);
+      }}
+      .modal-tab-buttons label.subtab svg {{
+        flex-shrink: 0;
       }}
 
       /* Modal tab panels */
