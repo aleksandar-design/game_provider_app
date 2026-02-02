@@ -881,9 +881,9 @@ st.markdown(
         font-size: 0.8rem;
       }}
       .country-disclaimer.restricted {{
-        background: rgba(251, 191, 36, 0.1);
-        color: {t["chart_yellow"]};
-        border: 1px solid rgba(251, 191, 36, 0.2);
+        background: rgba(239, 68, 68, 0.1);
+        color: #EF4444;
+        border: 1px solid rgba(239, 68, 68, 0.2);
       }}
       .country-disclaimer.regulated {{
         background: rgba(59, 130, 246, 0.1);
@@ -1768,17 +1768,23 @@ st.markdown(
       .icon-success {{ color: var(--chart-green); }}
 
       /* Country tag variants */
+      /* Restricted - red (danger - cannot offer) */
       .country-tag.restricted {{
-        border-color: var(--tag-restricted-text);
+        border-color: #EF4444;
+        background: rgba(239, 68, 68, 0.1);
       }}
       .country-tag.restricted .iso {{
-        background: var(--tag-restricted-text);
+        background: #EF4444;
+        color: white;
       }}
+      /* Regulated - blue (info - can offer with compliance) */
       .country-tag.regulated {{
-        border-color: var(--tag-regulated-text);
+        border-color: #3B82F6;
+        background: rgba(59, 130, 246, 0.1);
       }}
       .country-tag.regulated .iso {{
-        background: var(--tag-regulated-text);
+        background: #3B82F6;
+        color: white;
       }}
 
       /* Utility classes */
