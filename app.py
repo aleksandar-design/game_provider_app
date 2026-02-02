@@ -189,6 +189,10 @@ def svg_icon(name: str, color: str = "currentColor", size: int = 16) -> str:
         "card": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
         "crypto": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="6"/><circle cx="16" cy="9" r="6"/></svg>',
         "dice": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="{color}"/><circle cx="15.5" cy="8.5" r="1.5" fill="{color}"/><circle cx="8.5" cy="15.5" r="1.5" fill="{color}"/><circle cx="15.5" cy="15.5" r="1.5" fill="{color}"/></svg>',
+        "x-circle": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        "check-circle": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>',
+        "alert-triangle": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        "info": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
     }
     return icons.get(name, "")
 
@@ -690,9 +694,12 @@ st.markdown(
         display: block;
       }}
 
-      /* Provider main tabs styling */
+      /* Provider main tabs styling - pure CSS radio pattern */
       .provider-main-tabs {{
         margin-bottom: 1rem;
+      }}
+      .provider-main-tabs > input[type="radio"] {{
+        display: none;
       }}
       .main-tab-buttons {{
         display: flex;
@@ -727,13 +734,336 @@ st.markdown(
       .provider-main-tabs .main-panel {{
         display: none;
       }}
-      .provider-main-tabs .main-panel.active {{
-        display: block;
-      }}
-      .provider-main-tabs .main-tab.active {{
+      /* Main tabs active states - CSS sibling selectors */
+      .provider-main-tabs input[id$="-currencies"]:checked ~ .main-tab-buttons label[for$="-currencies"],
+      .provider-main-tabs input[id$="-countries"]:checked ~ .main-tab-buttons label[for$="-countries"],
+      .provider-main-tabs input[id$="-gamelist"]:checked ~ .main-tab-buttons label[for$="-gamelist"],
+      .provider-main-tabs input[id$="-assets"]:checked ~ .main-tab-buttons label[for$="-assets"] {{
         background: rgb(59, 130, 246);
         border-color: rgb(59, 130, 246);
         color: white;
+      }}
+      .provider-main-tabs input[id$="-currencies"]:checked ~ .currencies-panel {{
+        display: block;
+      }}
+      .provider-main-tabs input[id$="-countries"]:checked ~ .countries-panel {{
+        display: block;
+      }}
+      .provider-main-tabs input[id$="-gamelist"]:checked ~ .gamelist-panel {{
+        display: block;
+      }}
+      .provider-main-tabs input[id$="-assets"]:checked ~ .assets-panel {{
+        display: block;
+      }}
+
+      /* Country type sub-tabs - same pattern as currency tabs */
+      .country-type-tabs {{
+        margin-top: 0.5rem;
+      }}
+      .country-type-tabs > input[type="radio"] {{
+        display: none;
+      }}
+      .country-tab-buttons {{
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }}
+      .country-type-tabs .subtab {{
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        background: {t["bg_secondary"]};
+        border: 1px solid {t["border"]};
+        color: {t["text_secondary"]};
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }}
+      .country-type-tabs .subtab:hover {{
+        background: {t["bg_hover"]};
+      }}
+      .country-type-tabs .restricted-panel,
+      .country-type-tabs .regulated-panel {{
+        display: none;
+      }}
+      .country-type-tabs input[id$="-restricted"]:checked ~ .country-tab-buttons label[for$="-restricted"],
+      .country-type-tabs input[id$="-regulated"]:checked ~ .country-tab-buttons label[for$="-regulated"] {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
+      }}
+      .country-type-tabs input[id$="-restricted"]:checked ~ .restricted-panel {{
+        display: block;
+      }}
+      .country-type-tabs input[id$="-regulated"]:checked ~ .regulated-panel {{
+        display: block;
+      }}
+
+      /* Country section layout */
+      .country-section {{
+        margin-bottom: 1.5rem;
+      }}
+      .country-section:last-child {{
+        margin-bottom: 0;
+      }}
+
+      /* Section header with counter */
+      .country-section-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }}
+      .country-section-title {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }}
+      .country-count {{
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }}
+
+      /* Disclaimer styling */
+      .country-disclaimer {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }}
+      .country-disclaimer.restricted {{
+        background: rgba(251, 191, 36, 0.1);
+        color: {t["chart_yellow"]};
+        border: 1px solid rgba(251, 191, 36, 0.2);
+      }}
+      .country-disclaimer.regulated {{
+        background: rgba(59, 130, 246, 0.1);
+        color: {t["primary"]};
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }}
+      .country-disclaimer svg {{
+        flex-shrink: 0;
+      }}
+
+      /* Modal overlay */
+      .modal-overlay {{
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }}
+      .modal-overlay.open {{
+        display: flex;
+      }}
+
+      /* Modal content */
+      .modal-content {{
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }}
+
+      /* Modal header */
+      .modal-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }}
+      .modal-header h3 {{
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 1.1rem;
+      }}
+      .modal-close {{
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+      }}
+      .modal-close:hover {{
+        color: var(--text-primary);
+      }}
+
+      /* Modal search input */
+      .modal-search {{
+        padding: 1rem 1.5rem;
+      }}
+      .modal-search input {{
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        box-sizing: border-box;
+      }}
+      .modal-search input::placeholder {{
+        color: var(--text-muted);
+      }}
+      .modal-search input:focus {{
+        outline: none;
+        border-color: var(--primary);
+      }}
+
+      /* Modal tabs */
+      .modal-tabs {{
+        padding: 0 1.5rem 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+      }}
+      .modal-tabs > input[type="radio"] {{
+        display: none;
+      }}
+      .modal-tab-buttons {{
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }}
+      .modal-tabs .subtab {{
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        background: {t["bg_secondary"]};
+        border: 1px solid {t["border"]};
+        color: {t["text_secondary"]};
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }}
+      .modal-tabs .subtab:hover {{
+        background: {t["bg_hover"]};
+      }}
+
+      /* Modal tab panels */
+      .modal-restricted-panel,
+      .modal-regulated-panel {{
+        display: none;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }}
+      .modal-tabs input[id$="-restricted"]:checked ~ .modal-tab-buttons label[for$="-restricted"],
+      .modal-tabs input[id$="-regulated"]:checked ~ .modal-tab-buttons label[for$="-regulated"] {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
+      }}
+      .modal-tabs input[id$="-restricted"]:checked ~ .modal-restricted-panel {{
+        display: flex;
+      }}
+      .modal-tabs input[id$="-regulated"]:checked ~ .modal-regulated-panel {{
+        display: flex;
+      }}
+
+      /* View All button */
+      .view-all-btn {{
+        background: var(--bg-hover);
+        border: 1px dashed var(--border);
+        border-radius: 20px;
+        padding: 0.5rem 1rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+        transition: all 0.2s ease;
+      }}
+      .view-all-btn:hover {{
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        border-style: solid;
+      }}
+
+      /* Hidden by search */
+      .country-tag.hidden {{
+        display: none !important;
+      }}
+      .currency-btn.hidden {{
+        display: none !important;
+      }}
+
+      /* Currency modal grid - more columns since modal is wider */
+      .modal-currency-grid {{
+        grid-template-columns: repeat(4, 1fr) !important;
+      }}
+
+      @media (max-width: 640px) {{
+        .modal-currency-grid {{
+          grid-template-columns: repeat(2, 1fr) !important;
+        }}
+      }}
+
+      /* Currency more toggle styled as currency button */
+      .currency-btn.more-toggle {{
+        background: var(--bg-hover) !important;
+        border-style: dashed !important;
+        cursor: pointer;
+      }}
+      .currency-btn.more-toggle:hover {{
+        background: var(--primary) !important;
+        color: white !important;
+        border-color: var(--primary) !important;
+        border-style: solid !important;
+      }}
+
+      /* Modal body scrollable area */
+      .modal-body {{
+        padding: 0 1.5rem 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+      }}
+
+      /* Currency modal tabs - reuse modal-tabs pattern */
+      .currency-modal-tabs > input[type="radio"] {{
+        display: none;
+      }}
+      .currency-modal-tabs .fiat-panel,
+      .currency-modal-tabs .crypto-panel {{
+        display: none;
+      }}
+      .currency-modal-tabs input[id$="-fiat"]:checked ~ .fiat-panel {{
+        display: block;
+      }}
+      .currency-modal-tabs input[id$="-crypto"]:checked ~ .crypto-panel {{
+        display: block;
+      }}
+      .currency-modal-tabs input[id$="-fiat"]:checked ~ .modal-tab-buttons label[for$="-fiat"],
+      .currency-modal-tabs input[id$="-crypto"]:checked ~ .modal-tab-buttons label[for$="-crypto"] {{
+        background: rgb(59, 130, 246);
+        border-color: rgb(59, 130, 246);
+        color: white;
+      }}
+
+      /* Modal header with count */
+      .modal-header .modal-count {{
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-left: auto;
+        margin-right: 1rem;
       }}
 
       /* Expander styling */
@@ -1422,10 +1752,10 @@ components.html(
 
       function stopIfTabClick(e) {
         // Currency sub-tabs - explicitly check radio since stopPropagation prevents default
-        const subtab = e.target.closest('.currency-tabs label.subtab');
-        if (subtab) {
+        const currencySubtab = e.target.closest('.currency-tabs label.subtab');
+        if (currencySubtab) {
           if (e.type === 'click') {
-            const radioId = subtab.getAttribute('for');
+            const radioId = currencySubtab.getAttribute('for');
             if (radioId) {
               const radio = doc.getElementById(radioId);
               if (radio) radio.checked = true;
@@ -1434,9 +1764,33 @@ components.html(
           e.stopPropagation();
           return;
         }
-        // Main tabs
-        if (e.target.closest('.provider-main-tabs .main-tab')) {
+
+        // Country sub-tabs
+        const countrySubtab = e.target.closest('.country-type-tabs label.subtab');
+        if (countrySubtab) {
+          if (e.type === 'click') {
+            const radioId = countrySubtab.getAttribute('for');
+            if (radioId) {
+              const radio = doc.getElementById(radioId);
+              if (radio) radio.checked = true;
+            }
+          }
           e.stopPropagation();
+          return;
+        }
+
+        // Main tabs
+        const mainTab = e.target.closest('.provider-main-tabs label.main-tab');
+        if (mainTab) {
+          if (e.type === 'click') {
+            const radioId = mainTab.getAttribute('for');
+            if (radioId) {
+              const radio = doc.getElementById(radioId);
+              if (radio) radio.checked = true;
+            }
+          }
+          e.stopPropagation();
+          return;
         }
       }
 
@@ -1455,6 +1809,111 @@ components.html(
               if (d !== card) d.open = false;
             });
           }
+        }
+      }, true);
+
+      // Modal open (View All button)
+      doc.addEventListener('click', function(e) {
+        const openBtn = e.target.closest('[data-modal]');
+        if (openBtn) {
+          const modalId = openBtn.getAttribute('data-modal');
+          const modal = doc.getElementById(modalId);
+          if (modal) {
+            modal.classList.add('open');
+            // Focus search input when modal opens
+            const searchInput = modal.querySelector('.country-search');
+            if (searchInput) {
+              setTimeout(function() { searchInput.focus(); }, 100);
+            }
+          }
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      });
+
+      // Modal close (X button)
+      doc.addEventListener('click', function(e) {
+        const closeBtn = e.target.closest('[data-close-modal]');
+        if (closeBtn) {
+          const modalId = closeBtn.getAttribute('data-close-modal');
+          const modal = doc.getElementById(modalId);
+          if (modal) modal.classList.remove('open');
+          e.stopPropagation();
+        }
+      });
+
+      // Modal close (backdrop click)
+      doc.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal-overlay')) {
+          e.target.classList.remove('open');
+        }
+      });
+
+      // Modal close (ESC key)
+      doc.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          doc.querySelectorAll('.modal-overlay.open').forEach(function(m) {
+            m.classList.remove('open');
+          });
+        }
+      });
+
+      // Modal tab click handler
+      doc.addEventListener('click', function(e) {
+        const modalSubtab = e.target.closest('.modal-tabs label.subtab');
+        if (modalSubtab) {
+          const radioId = modalSubtab.getAttribute('for');
+          if (radioId) {
+            const radio = doc.getElementById(radioId);
+            if (radio) radio.checked = true;
+          }
+          e.stopPropagation();
+        }
+      }, true);
+
+      // Country search filter
+      doc.addEventListener('input', function(e) {
+        if (e.target.classList.contains('country-search')) {
+          const query = e.target.value.toLowerCase();
+          const modalId = e.target.getAttribute('data-target');
+          const modal = doc.getElementById(modalId);
+          if (modal) {
+            modal.querySelectorAll('.country-tag').forEach(function(tag) {
+              const name = tag.getAttribute('data-name') || tag.textContent.toLowerCase();
+              tag.classList.toggle('hidden', !name.includes(query));
+            });
+          }
+        }
+      });
+
+      // Currency search filter
+      doc.addEventListener('input', function(e) {
+        if (e.target.classList.contains('currency-search-input')) {
+          const query = e.target.value.toLowerCase();
+          const modalId = e.target.getAttribute('data-modal-id');
+          const modal = doc.getElementById(modalId);
+          if (modal) {
+            modal.querySelectorAll('.currency-btn:not(.more-toggle)').forEach(function(btn) {
+              const code = btn.getAttribute('data-code') || '';
+              const name = btn.getAttribute('data-name') || '';
+              const text = btn.textContent.toLowerCase();
+              const match = code.includes(query) || name.includes(query) || text.includes(query);
+              btn.classList.toggle('hidden', !match);
+            });
+          }
+        }
+      });
+
+      // Currency modal tab click handler
+      doc.addEventListener('click', function(e) {
+        const currencySubtab = e.target.closest('.currency-modal-tabs label.subtab');
+        if (currencySubtab) {
+          const radioId = currencySubtab.getAttribute('for');
+          if (radioId) {
+            const radio = doc.getElementById(radioId);
+            if (radio) radio.checked = true;
+          }
+          e.stopPropagation();
         }
       }, true);
     })();
@@ -2695,33 +3154,156 @@ else:
             {format_game_type(gt) for gt in game_types_map.get(pid, []) if gt}
         )
 
-        # Build Countries section HTML
-        countries_html = ""
-        # Restricted Countries
-        if details["restricted"]:
-            countries_html += f'<div class="section-header"><span class="icon-warning">⚠</span> Restricted Countries ({len(details["restricted"])})</div>'
-            restricted_countries = get_country_info(details["restricted"][:20])
-            countries_html += f'<div class="country-tags">'
-            for c in restricted_countries:
-                countries_html += f'<span class="country-tag restricted"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
-            if len(details["restricted"]) > 20:
-                countries_html += f'<span class="country-tag">+{len(details["restricted"]) - 20} more</span>'
-            countries_html += '</div>'
+        # Build Countries section HTML with sub-tabs if needed
+        has_restricted = bool(details["restricted"])
+        has_regulated = bool(details["regulated"])
 
-        # Regulated Countries
-        if details["regulated"]:
-            countries_html += f'<div class="section-header"><span class="icon-regulated">⚖</span> Regulated Countries ({len(details["regulated"])})</div>'
+        # Build restricted HTML
+        restricted_html = ""
+        if has_restricted:
+            restricted_countries = get_country_info(details["restricted"][:20])
+            restricted_tags = ''.join([
+                f'<span class="country-tag restricted"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
+                for c in restricted_countries
+            ])
+            restricted_count = len(details["restricted"])
+            restricted_html = f'''<div class="country-section">
+  <div class="country-section-header">
+    <div class="country-section-title">{svg_icon("x-circle", t["chart_red"], 16)} Restricted Countries</div>
+    <div class="country-count">{restricted_count} {"country" if restricted_count == 1 else "countries"}</div>
+  </div>
+  <div class="country-tags">{restricted_tags}</div>
+  <div class="country-disclaimer restricted">{svg_icon("alert-triangle", t["chart_yellow"], 14)} Games cannot be offered in these countries</div>
+</div>'''
+
+        # Build regulated HTML
+        regulated_html = ""
+        if has_regulated:
             regulated_countries = get_country_info(details["regulated"][:20])
-            countries_html += '<div class="country-tags">'
-            for c in regulated_countries:
-                countries_html += f'<span class="country-tag regulated"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
-            if len(details["regulated"]) > 20:
-                countries_html += f'<span class="country-tag">+{len(details["regulated"]) - 20} more</span>'
-            countries_html += '</div>'
+            regulated_tags = ''.join([
+                f'<span class="country-tag regulated"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
+                for c in regulated_countries
+            ])
+            regulated_count = len(details["regulated"])
+            regulated_html = f'''<div class="country-section">
+  <div class="country-section-header">
+    <div class="country-section-title">{svg_icon("check-circle", t["primary"], 16)} Regulated Countries</div>
+    <div class="country-count">{regulated_count} {"country" if regulated_count == 1 else "countries"}</div>
+  </div>
+  <div class="country-tags">{regulated_tags}</div>
+  <div class="country-disclaimer regulated">{svg_icon("info", t["primary"], 14)} Games can be offered but must comply with local regulations</div>
+</div>'''
+
+        # Build countries section with sub-tabs if both types exist
+        countries_html = ""
+        countries_modal_html = ""
+        total_countries = len(details["restricted"]) + len(details["regulated"])
+
+        if has_restricted and has_regulated:
+            country_tab_id = f"country_{pid}"
+            countries_html = (
+                f'<div class="country-type-tabs">'
+                f'<input type="radio" id="{country_tab_id}-restricted" name="{country_tab_id}" checked>'
+                f'<input type="radio" id="{country_tab_id}-regulated" name="{country_tab_id}">'
+                f'<div class="country-tab-buttons">'
+                f'<label for="{country_tab_id}-restricted" class="subtab">{svg_icon("x-circle", "currentColor", 14)} Restricted ({len(details["restricted"])})</label>'
+                f'<label for="{country_tab_id}-regulated" class="subtab">{svg_icon("check-circle", "currentColor", 14)} Regulated ({len(details["regulated"])})</label>'
+                f'</div>'
+                f'<div class="restricted-panel">{restricted_html}</div>'
+                f'<div class="regulated-panel">{regulated_html}</div>'
+                f'</div>'
+            )
+        elif has_restricted:
+            countries_html = restricted_html
+        elif has_regulated:
+            countries_html = regulated_html
+        else:
+            countries_html = '<p class="muted-text">No country restrictions</p>'
+
+        # Add "View All" button and build modal if there are countries
+        if has_restricted or has_regulated:
+            # Build modal with ALL countries
+            all_restricted_countries = get_country_info(details["restricted"])
+            all_regulated_countries = get_country_info(details["regulated"])
+
+            # Build restricted section for modal (all countries)
+            modal_restricted_tags = ''.join([
+                f'<span class="country-tag restricted" data-name="{c["name"].lower()}"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
+                for c in all_restricted_countries
+            ])
+            restricted_count = len(details["restricted"])
+            modal_restricted_section = f'''<div class="country-section">
+  <div class="country-section-header">
+    <div class="country-section-title">{svg_icon("x-circle", t["chart_red"], 16)} Restricted Countries</div>
+    <div class="country-count">{restricted_count} {"country" if restricted_count == 1 else "countries"}</div>
+  </div>
+  <div class="country-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">{modal_restricted_tags}</div>
+  <div class="country-disclaimer restricted">{svg_icon("alert-triangle", t["chart_yellow"], 14)} Games cannot be offered in these countries</div>
+</div>'''
+
+            # Build regulated section for modal (all countries)
+            modal_regulated_tags = ''.join([
+                f'<span class="country-tag regulated" data-name="{c["name"].lower()}"><span class="iso">{c["iso2"]}</span>{c["name"]}</span>'
+                for c in all_regulated_countries
+            ])
+            regulated_count = len(details["regulated"])
+            modal_regulated_section = f'''<div class="country-section">
+  <div class="country-section-header">
+    <div class="country-section-title">{svg_icon("check-circle", t["primary"], 16)} Regulated Countries</div>
+    <div class="country-count">{regulated_count} {"country" if regulated_count == 1 else "countries"}</div>
+  </div>
+  <div class="country-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">{modal_regulated_tags}</div>
+  <div class="country-disclaimer regulated">{svg_icon("info", t["primary"], 14)} Games can be offered but must comply with local regulations</div>
+</div>'''
+
+            # Build modal tabs HTML (only show tabs that have data)
+            modal_tab_id = f"modal_{pid}"
+            if has_restricted and has_regulated:
+                # Default to restricted tab
+                modal_tabs_html = (
+                    f'<input type="radio" id="{modal_tab_id}-restricted" name="{modal_tab_id}" checked>'
+                    f'<input type="radio" id="{modal_tab_id}-regulated" name="{modal_tab_id}">'
+                    f'<div class="modal-tab-buttons">'
+                    f'<label for="{modal_tab_id}-restricted" class="subtab">{svg_icon("x-circle", "currentColor", 14)} Restricted ({len(details["restricted"])})</label>'
+                    f'<label for="{modal_tab_id}-regulated" class="subtab">{svg_icon("check-circle", "currentColor", 14)} Regulated ({len(details["regulated"])})</label>'
+                    f'</div>'
+                    f'<div class="modal-restricted-panel">{modal_restricted_section}</div>'
+                    f'<div class="modal-regulated-panel">{modal_regulated_section}</div>'
+                )
+            elif has_restricted:
+                modal_tabs_html = (
+                    f'<input type="radio" id="{modal_tab_id}-restricted" name="{modal_tab_id}" checked>'
+                    f'<div class="modal-restricted-panel" style="display: block;">{modal_restricted_section}</div>'
+                )
+            else:  # has_regulated only
+                modal_tabs_html = (
+                    f'<input type="radio" id="{modal_tab_id}-regulated" name="{modal_tab_id}" checked>'
+                    f'<div class="modal-regulated-panel" style="display: block;">{modal_regulated_section}</div>'
+                )
+
+            # Build the complete modal HTML
+            countries_modal_html = f'''<div class="modal-overlay" id="countries-modal-{pid}">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Countries - {pname}</h3>
+      <button class="modal-close" data-close-modal="countries-modal-{pid}">&times;</button>
+    </div>
+    <div class="modal-search">
+      <input type="text" placeholder="Search countries..." class="country-search" data-target="countries-modal-{pid}">
+    </div>
+    <div class="modal-tabs">
+      {modal_tabs_html}
+    </div>
+  </div>
+</div>'''
+
+            # Add "View All" button to countries_html
+            countries_html += f'<button class="view-all-btn" data-modal="countries-modal-{pid}">View All ({total_countries} countries)</button>'
 
         # Supported Currencies - build fiat and crypto HTML
         fiat_html = ""
         crypto_html = ""
+        currencies_modal_html = ""
 
         # Build fiat HTML
         fiat_list = fiat_map.get(pid, [])
@@ -2735,9 +3317,9 @@ else:
                 for curr in fiat_list[:9]:
                     symbol = get_currency_symbol(curr)
                     fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
-                fiat_html += '</div>'
                 if len(fiat_list) > 9:
-                    fiat_html += f'<div class="more-text">+{len(fiat_list) - 9} more</div>'
+                    fiat_html += f'<div class="currency-btn fiat more-toggle" data-modal="currencies-modal-{pid}">+{len(fiat_list) - 9} more</div>'
+                fiat_html += '</div>'
 
         # Build crypto HTML
         crypto_list = crypto_map.get(pid, [])
@@ -2748,9 +3330,64 @@ else:
             for curr in crypto_list[:9]:
                 symbol = get_currency_symbol(curr)
                 crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
-            crypto_html += '</div>'
             if len(crypto_list) > 9:
-                crypto_html += f'<div class="more-text">+{len(crypto_list) - 9} more</div>'
+                crypto_html += f'<div class="currency-btn crypto more-toggle" data-modal="currencies-modal-{pid}">+{len(crypto_list) - 9} more</div>'
+            crypto_html += '</div>'
+
+        # Build currencies modal if there are more than 9 of either type
+        if (len(fiat_list) > 9 or len(crypto_list) > 9) and details["currency_mode"] != "ALL_FIAT":
+            total_currencies = len(fiat_list) + len(crypto_list)
+
+            # Build fiat section for modal (ALL currencies)
+            modal_fiat_html = '<div class="currency-grid modal-currency-grid">'
+            for curr in fiat_list:
+                symbol = get_currency_symbol(curr)
+                modal_fiat_html += f'<div class="currency-btn fiat" data-code="{curr.lower()}"><span class="symbol">{symbol}</span>{curr}</div>'
+            modal_fiat_html += '</div>'
+
+            # Build crypto section for modal (ALL currencies)
+            modal_crypto_html = '<div class="currency-grid modal-currency-grid">'
+            for curr in crypto_list:
+                symbol = get_currency_symbol(curr)
+                modal_crypto_html += f'<div class="currency-btn crypto" data-code="{curr.lower()}"><span class="symbol">{symbol}</span>{curr}</div>'
+            modal_crypto_html += '</div>'
+
+            # Build modal tabs if both exist, otherwise single panel
+            curr_modal_id = f"currmodal_{pid}"
+            if has_fiat and has_crypto:
+                modal_currency_tabs_html = (
+                    f'<div class="currency-modal-tabs">'
+                    f'<input type="radio" id="{curr_modal_id}-fiat" name="{curr_modal_id}" checked>'
+                    f'<input type="radio" id="{curr_modal_id}-crypto" name="{curr_modal_id}">'
+                    f'<div class="modal-tab-buttons">'
+                    f'<label for="{curr_modal_id}-fiat" class="subtab">{svg_icon("card", "currentColor", 14)} Fiat ({len(fiat_list)})</label>'
+                    f'<label for="{curr_modal_id}-crypto" class="subtab">{svg_icon("crypto", "currentColor", 14)} Crypto ({len(crypto_list)})</label>'
+                    f'</div>'
+                    f'<div class="fiat-panel">{modal_fiat_html}</div>'
+                    f'<div class="crypto-panel">{modal_crypto_html}</div>'
+                    f'</div>'
+                )
+            elif has_fiat:
+                modal_currency_tabs_html = modal_fiat_html
+            else:
+                modal_currency_tabs_html = modal_crypto_html
+
+            # Build complete currencies modal
+            currencies_modal_html = f'''<div class="modal-overlay" id="currencies-modal-{pid}">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Currencies - {pname}</h3>
+      <span class="modal-count">{total_currencies} currencies</span>
+      <button class="modal-close" data-close-modal="currencies-modal-{pid}">&times;</button>
+    </div>
+    <div class="modal-search">
+      <input type="text" placeholder="Search currencies..." class="currency-search-input" data-modal-id="currencies-modal-{pid}">
+    </div>
+    <div class="modal-body">
+      {modal_currency_tabs_html}
+    </div>
+  </div>
+</div>'''
 
         # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
         currencies_html = ""
@@ -2774,16 +3411,21 @@ else:
         elif has_crypto:
             currencies_html = crypto_html
 
-        # Build top-level tabs wrapper (buttons)
+        # Build top-level tabs wrapper (pure CSS radio pattern)
+        main_tab_id = f"main_{pid}"
         details_html = (
             f'<div class="provider-main-tabs">'
+            f'<input type="radio" id="{main_tab_id}-currencies" name="{main_tab_id}" checked>'
+            f'<input type="radio" id="{main_tab_id}-countries" name="{main_tab_id}">'
+            f'<input type="radio" id="{main_tab_id}-gamelist" name="{main_tab_id}">'
+            f'<input type="radio" id="{main_tab_id}-assets" name="{main_tab_id}">'
             f'<div class="main-tab-buttons">'
-            f'<button class="main-tab active" data-target="currencies" type="button">{svg_icon("wallet", "currentColor", 14)} Currencies</button>'
-            f'<button class="main-tab" data-target="countries" type="button">{svg_icon("globe", "currentColor", 14)} Countries</button>'
-            f'<button class="main-tab" data-target="gamelist" type="button">{svg_icon("gamepad", "currentColor", 14)} Game List</button>'
-            f'<button class="main-tab" data-target="assets" type="button">{svg_icon("folder", "currentColor", 14)} Assets</button>'
+            f'<label for="{main_tab_id}-currencies" class="main-tab">{svg_icon("wallet", "currentColor", 14)} Currencies</label>'
+            f'<label for="{main_tab_id}-countries" class="main-tab">{svg_icon("globe", "currentColor", 14)} Countries</label>'
+            f'<label for="{main_tab_id}-gamelist" class="main-tab">{svg_icon("gamepad", "currentColor", 14)} Game List</label>'
+            f'<label for="{main_tab_id}-assets" class="main-tab">{svg_icon("folder", "currentColor", 14)} Assets</label>'
             f'</div>'
-            f'<div class="main-panel currencies-panel active">{currencies_html}</div>'
+            f'<div class="main-panel currencies-panel">{currencies_html}</div>'
             f'<div class="main-panel countries-panel">{countries_html}</div>'
             f'<div class="main-panel gamelist-panel"><p class="muted-text">Game list coming soon</p></div>'
             f'<div class="main-panel assets-panel"><p class="muted-text">Assets coming soon</p></div>'
@@ -2792,6 +3434,11 @@ else:
 
         # Build card HTML
         card_html = f'''<details class="provider-card"><summary class="card-header"><div class="card-header-top"><div class="card-header-left"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 24)}</div><div><div class="provider-name">{pname}</div><div class="provider-games">{stats['games']} games</div></div></div><span class="expand-icon">▼</span></div><div class="card-games-section"><div class="games-label">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
+        # Append modal HTML if exists (modal must be outside the card)
+        if countries_modal_html:
+            card_html += countries_modal_html
+        if currencies_modal_html:
+            card_html += currencies_modal_html
         all_cards_html.append(card_html)
 
     # Render all cards in grid container
