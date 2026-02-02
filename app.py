@@ -1372,6 +1372,28 @@ st.markdown(
         .st-key-btn_logout button::after {{
           content: none !important;
         }}
+
+        /* Constrain expanded card content on mobile */
+        .provider-card {{
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }}
+        .provider-card .card-details-content {{
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+          box-sizing: border-box !important;
+        }}
+        .provider-card .currency-grid {{
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+        }}
+        .provider-card .currency-btn {{
+          min-width: 0 !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          padding: 0.5rem 0.75rem !important;
+          font-size: 0.75rem !important;
+        }}
       }}
 
       /* Extra small screens */
