@@ -957,7 +957,7 @@ st.markdown(
         border: 1px solid var(--border);
         border-radius: 16px;
         width: 95%;
-        max-width: 1700px;
+        max-width: 1500px;
         max-height: 80vh;
         overflow: hidden;
         display: flex;
@@ -1173,7 +1173,7 @@ st.markdown(
 
       /* Game List Modal - larger size */
       .modal-content.modal-lg {{
-        max-width: 1700px;
+        max-width: 1500px;
         max-height: 85vh;
       }}
 
