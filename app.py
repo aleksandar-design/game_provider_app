@@ -1639,13 +1639,11 @@ st.markdown(
         .filter-group {{
           min-width: 100%;
         }}
-        /* Keep horizontal layout on mobile */
+        /* Game list modal - mobile responsive */
         .game-card {{
-          flex-direction: row;
-          gap: 1rem;
+          gap: 0.75rem;
           padding: 1rem;
         }}
-        /* Smaller thumbnail on mobile */
         .game-thumbnail {{
           width: 70px;
           height: 93px;
@@ -1653,12 +1651,17 @@ st.markdown(
         }}
         .game-title {{
           font-size: 0.95rem;
+          margin-bottom: 0.5rem;
         }}
+        /* Meta items: 2x2 grid on mobile */
         .game-meta {{
-          gap: 1rem;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.5rem;
         }}
         .game-meta-item {{
           min-width: 0;
+          flex: unset;
         }}
         .meta-label {{
           font-size: 0.65rem;
@@ -1667,27 +1670,35 @@ st.markdown(
           font-size: 0.8rem;
         }}
         .volatility-badge {{
-          font-size: 0.65rem;
-          padding: 0.15rem 0.35rem;
+          font-size: 0.7rem;
+          padding: 0.15rem 0.45rem;
         }}
-        /* Show features on mobile (compact) */
+        /* Feature tags compact */
         .game-features {{
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.35rem;
-          margin-top: 0.5rem;
+          gap: 0.3rem;
         }}
         .feature-tag {{
           font-size: 0.65rem;
-          padding: 0.2rem 0.5rem;
+          padding: 0.2rem 0.45rem;
         }}
-        /* Modal subtitle on mobile */
+        /* Modal subtitle */
         .modal-subtitle {{
-          font-size: 0.8rem;
+          font-size: 0.75rem;
         }}
         .modal-header .provider-modal-icon {{
           width: 32px;
           height: 32px;
+        }}
+        /* Lightbox - larger image area on mobile */
+        .thumb-lightbox img {{
+          max-width: 95vw;
+          max-height: 85vh;
+          border-radius: 8px;
+        }}
+        /* Games list spacing */
+        .games-list {{
+          padding: 0.75rem 1rem;
+          gap: 0.75rem;
         }}
         /* Collapsible filter on mobile */
         .games-filter-collapse {{
@@ -1757,6 +1768,14 @@ st.markdown(
         [data-testid="stDownloadButton"] button svg,
         [data-testid="stDownloadButton"] button span[data-testid="stIconMaterial"] {{
           display: none !important;
+        }}
+
+        /* Collapse empty columns in the APPLY button row on mobile */
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) > div:not(:has(.st-key-btn_apply_filters)):not(:has(.st-key-btn_clear_all)):not(:has(.active-filters-row)) {{
+          display: none !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) {{
+          gap: 0.5rem !important;
         }}
       }}
 
