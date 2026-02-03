@@ -1528,6 +1528,7 @@ st.markdown(
         gap: 2rem;
         margin-bottom: 0.75rem;
         flex-wrap: wrap;
+        align-items: flex-start;
       }}
       .game-meta-item {{
         display: flex;
@@ -1541,11 +1542,14 @@ st.markdown(
         color: var(--text-muted);
         text-transform: uppercase;
         font-weight: 600;
+        line-height: 1.2;
+        height: 1em;
       }}
       .meta-value {{
         font-size: 0.9rem;
         color: var(--text-primary);
         font-weight: 600;
+        line-height: 1.4;
       }}
 
       /* Volatility badges */
@@ -1557,7 +1561,7 @@ st.markdown(
         border-radius: 12px;
         font-size: 0.8rem;
         font-weight: 600;
-        line-height: 1;
+        line-height: 1.4;
         width: fit-content;
         white-space: nowrap;
       }}
@@ -2114,7 +2118,12 @@ st.markdown(
       }}
 
       /* Download button - Figma style */
+      .stDownloadButton {{
+        display: flex !important;
+        justify-content: flex-end !important;
+      }}
       .stDownloadButton > button {{
+        width: auto !important;
         border-radius: 10px !important;
         font-weight: 500 !important;
         background: {t["primary"]} !important;
@@ -2284,14 +2293,10 @@ st.markdown(
          TABLET RESPONSIVE (1100px and below)
          =========================================== */
       @media (max-width: 1100px) {{
-        /* Logout button - show just arrow */
+        /* Logout button - compact on tablet */
         .st-key-btn_logout button {{
-          font-size: 0 !important;
+          font-size: 0.8rem !important;
           padding: 0.4rem 0.6rem !important;
-        }}
-        .st-key-btn_logout button::after {{
-          content: "→" !important;
-          font-size: 1rem !important;
         }}
         /* Export button more compact */
         .st-key-btn_export_excel button {{
@@ -2369,6 +2374,44 @@ st.markdown(
           min-width: calc(50% - 0.25rem) !important;
           font-size: 0.75rem !important;
         }}
+
+        /* Collapse empty columns in APPLY button row on tablet */
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) > div:not(:has(.st-key-btn_apply_filters)):not(:has(.st-key-btn_clear_all)):not(:has(.active-filters-row)) {{
+          display: none !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) {{
+          gap: 0.5rem !important;
+        }}
+
+        /* Provider list header - title left, export right on tablet */
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) {{
+          flex-wrap: wrap !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:first-child {{
+          flex: 1 1 100% !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:last-child {{
+          margin-left: auto !important;
+          flex: 0 0 auto !important;
+          width: auto !important;
+        }}
+        /* Hide empty middle column */
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:nth-child(2):empty,
+        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:nth-child(2):not(:has(*)) {{
+          display: none !important;
+        }}
+        /* Export button compact right-aligned */
+        .stDownloadButton {{
+          display: flex !important;
+          justify-content: flex-end !important;
+        }}
+        .stDownloadButton > button {{
+          width: auto !important;
+          min-width: 0 !important;
+          font-size: 0.8rem !important;
+          padding: 0.4rem 1rem !important;
+          white-space: nowrap !important;
+        }}
       }}
 
       /* ===========================================
@@ -2434,24 +2477,13 @@ st.markdown(
           min-width: auto !important;
           white-space: nowrap !important;
         }}
-        /* Reset logout button - show original text, remove tablet ::after */
+        /* Logout button - compact on mobile */
         .st-key-btn_logout button {{
           font-size: 0.8rem !important;
           padding: 0.4rem 0.75rem !important;
           min-width: auto !important;
           white-space: nowrap !important;
         }}
-        .st-key-btn_logout button::after {{
-          content: none !important;
-        }}
-
-        /* Export button - compact on mobile */
-        .st-key-btn_export_excel button {{
-          font-size: 0 !important;
-          padding: 0.4rem 0.6rem !important;
-          min-width: auto !important;
-        }}
-
 
         /* Constrain expanded card content on mobile */
         .provider-card {{
@@ -2985,11 +3017,15 @@ components.html(
         } catch(err) {}
       }, true);
 
-      // Thumbnail lightbox - create overlay element once
-      var lightbox = doc.createElement('div');
-      lightbox.className = 'thumb-lightbox';
-      lightbox.innerHTML = '<img src="" alt="">';
-      doc.body.appendChild(lightbox);
+      // Thumbnail lightbox - create overlay element once (idempotent)
+      var lightbox = doc.getElementById('tt-thumb-lightbox');
+      if (!lightbox) {
+        lightbox = doc.createElement('div');
+        lightbox.id = 'tt-thumb-lightbox';
+        lightbox.className = 'thumb-lightbox';
+        lightbox.innerHTML = '<img src="" alt="">';
+        doc.body.appendChild(lightbox);
+      }
       var lightboxImg = lightbox.querySelector('img');
 
       // Open lightbox on thumbnail click
@@ -4231,7 +4267,6 @@ with pcol3:
         file_name="providers.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="btn_export_excel",
-        use_container_width=True,
     )
 
 # =================================================
