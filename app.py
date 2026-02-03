@@ -898,10 +898,12 @@ st.markdown(
       .export-btn {{
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 0.35rem;
         padding: 0.4rem 0.75rem;
         font-size: 0.8rem;
         font-weight: 600;
+        line-height: 1;
         background: #3B82F6;
         border: 1px solid #3B82F6;
         border-radius: 6px;
@@ -915,7 +917,11 @@ st.markdown(
         border-color: #2563EB;
       }}
       .export-btn::before {{
-        content: "↓ ";
+        content: "↓";
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }}
       /* Panel header with title and export button */
       .panel-header {{
@@ -971,6 +977,10 @@ st.markdown(
         color: var(--text-primary);
         font-size: 1.1rem;
         flex: 1;
+      }}
+      /* Hide auto-generated anchor link on modal headings */
+      .modal-header h3 a {{
+        display: none !important;
       }}
       .modal-header .modal-count {{
         font-size: 0.85rem;
@@ -1521,6 +1531,24 @@ st.markdown(
         .filter-apply-btn:active {{
           transform: scale(0.98);
           opacity: 0.9;
+        }}
+
+        /* Export buttons - compact with text on mobile */
+        .modal-header .export-btn {{
+          font-size: 0.7rem !important;
+          padding: 0.3rem 0.6rem !important;
+          white-space: nowrap;
+        }}
+        .panel-header .export-btn {{
+          font-size: 0.7rem !important;
+          padding: 0.3rem 0.6rem !important;
+          white-space: nowrap;
+        }}
+
+        /* Hide icon in Streamlit download button on mobile */
+        [data-testid="stDownloadButton"] button svg,
+        [data-testid="stDownloadButton"] button span[data-testid="stIconMaterial"] {{
+          display: none !important;
         }}
       }}
 
@@ -2190,10 +2218,7 @@ st.markdown(
           padding: 0.4rem 0.6rem !important;
           min-width: auto !important;
         }}
-        .st-key-btn_export_excel button::after {{
-          content: "📥" !important;
-          font-size: 1rem !important;
-        }}
+
 
         /* Constrain expanded card content on mobile */
         .provider-card {{
