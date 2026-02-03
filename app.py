@@ -521,7 +521,8 @@ st.markdown(
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.75rem;
+        margin-top: 1rem;
+        margin-bottom: 1.25rem;
       }}
       .providers-title {{
         font-size: 1.125rem;
@@ -2407,6 +2408,14 @@ st.markdown(
           padding: 0.4rem 0.75rem !important;
           min-width: auto !important;
           white-space: nowrap !important;
+        }}
+
+        /* Provider list header - stack and center on mobile */
+        .provider-list-header {{
+          flex-direction: column !important;
+          align-items: center !important;
+          gap: 0.75rem !important;
+          text-align: center !important;
         }}
 
         /* Constrain expanded card content on mobile */
@@ -4616,7 +4625,6 @@ else:
       <h3>{pname}</h3>
       <span class="modal-count">{game_count} games</span>
       {games_export_btn}
-      <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
       <div class="modal-subtitle">Browse and filter games from {pname} to find the perfect match for your needs.</div>
     </div>
     <details class="games-filter-collapse" open>
