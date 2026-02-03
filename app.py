@@ -516,12 +516,17 @@ st.markdown(
       .stat-icon.providers {{ background: {t["stat_icon_providers_bg"]}; color: {t["primary"]}; }}
       .stat-icon.currencies {{ background: {t["stat_icon_currencies_bg"]}; color: {t["chart_yellow"]}; }}
 
-      /* Provider title */
+      /* Provider list header row */
+      .provider-list-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }}
       .providers-title {{
         font-size: 1.125rem;
         font-weight: 600;
         color: {t["text_primary"]};
-        margin-bottom: 0.75rem;
       }}
       .tags-container {{
         display: flex;
@@ -972,20 +977,20 @@ st.markdown(
         flex-shrink: 0;
       }}
 
-      /* Export button - small inline download link */
+      /* Export button - Figma style */
       .export-btn {{
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.35rem;
-        padding: 0.4rem 0.75rem;
-        font-size: 0.8rem;
-        font-weight: 600;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
         line-height: 1;
-        background: #3B82F6;
-        border: 1px solid #3B82F6;
-        border-radius: 6px;
-        color: #FFFFFF !important;
+        background: {t["primary"]};
+        border: 1px solid {t["primary"]};
+        border-radius: 10px;
+        color: {t["primary_foreground"]} !important;
         cursor: pointer;
         text-decoration: none !important;
         transition: all 0.2s ease;
@@ -1768,12 +1773,6 @@ st.markdown(
           white-space: nowrap;
         }}
 
-        /* Hide icon in Streamlit download button on mobile */
-        [data-testid="stDownloadButton"] button svg,
-        [data-testid="stDownloadButton"] button span[data-testid="stIconMaterial"] {{
-          display: none !important;
-        }}
-
         /* Collapse empty columns in the APPLY button row on mobile */
         div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) > div:not(:has(.st-key-btn_apply_filters)):not(:has(.st-key-btn_clear_all)):not(:has(.active-filters-row)) {{
           display: none !important;
@@ -1812,19 +1811,6 @@ st.markdown(
         padding: 0.5rem 0 !important;
         background: transparent !important;
         border: none !important;
-      }}
-
-      /* Export button - Figma style */
-      .export-btn {{
-        background: {t["primary"]};
-        color: {t["primary_foreground"]};
-        padding: 0.5rem 1rem;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 500;
       }}
 
       /* Streamlit overrides - Figma style */
@@ -2117,25 +2103,6 @@ st.markdown(
         color: {t["text_primary"]} !important;
       }}
 
-      /* Download button - Figma style */
-      .stDownloadButton {{
-        display: flex !important;
-        justify-content: flex-end !important;
-      }}
-      .stDownloadButton > button {{
-        width: auto !important;
-        border-radius: 10px !important;
-        font-weight: 500 !important;
-        background: {t["primary"]} !important;
-        color: {t["primary_foreground"]} !important;
-        border: none !important;
-        transition: all 0.2s ease !important;
-      }}
-      .stDownloadButton > button:hover {{
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px {t["primary"]}40 !important;
-      }}
-
       /* Clear all button overrides (beat generic button styling) */
       .stButton > button[key="btn_clear_all"] {{
         background: transparent !important;
@@ -2281,14 +2248,6 @@ st.markdown(
         overflow: hidden !important;
         text-overflow: ellipsis !important;
       }}
-      /* Export button - always prevent wrapping */
-      .st-key-btn_export_excel button {{
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        min-width: max-content !important;
-      }}
-
       /* ===========================================
          TABLET RESPONSIVE (1100px and below)
          =========================================== */
@@ -2296,11 +2255,6 @@ st.markdown(
         /* Logout button - compact on tablet */
         .st-key-btn_logout button {{
           font-size: 0.8rem !important;
-          padding: 0.4rem 0.6rem !important;
-        }}
-        /* Export button more compact */
-        .st-key-btn_export_excel button {{
-          font-size: 0.75rem !important;
           padding: 0.4rem 0.6rem !important;
         }}
         /* Provider cards - single column on tablets */
@@ -2381,36 +2335,6 @@ st.markdown(
         }}
         div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) {{
           gap: 0.5rem !important;
-        }}
-
-        /* Provider list header - title left, export right on tablet */
-        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) {{
-          flex-wrap: wrap !important;
-        }}
-        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:first-child {{
-          flex: 1 1 100% !important;
-        }}
-        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:last-child {{
-          margin-left: auto !important;
-          flex: 0 0 auto !important;
-          width: auto !important;
-        }}
-        /* Hide empty middle column */
-        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:nth-child(2):empty,
-        div[data-testid="stHorizontalBlock"]:has(.st-key-btn_export_excel) > div:nth-child(2):not(:has(*)) {{
-          display: none !important;
-        }}
-        /* Export button compact right-aligned */
-        .stDownloadButton {{
-          display: flex !important;
-          justify-content: flex-end !important;
-        }}
-        .stDownloadButton > button {{
-          width: auto !important;
-          min-width: 0 !important;
-          font-size: 0.8rem !important;
-          padding: 0.4rem 1rem !important;
-          white-space: nowrap !important;
         }}
       }}
 
@@ -4256,22 +4180,20 @@ st.markdown(f"""
 # =================================================
 # Provider list header with export
 # =================================================
-pcol1, pcol2, pcol3 = st.columns([7, 0.8, 1.2], gap="small")
-with pcol1:
-    st.markdown(f'<div class="providers-title">Game Providers ({len(df)})</div>', unsafe_allow_html=True)
-# pcol2 empty
-with pcol3:
-    # Export to Excel - aligned right under emoji
-    excel_buffer = io.BytesIO()
-    df.to_excel(excel_buffer, index=False, engine='openpyxl')
-    excel_buffer.seek(0)
-    st.download_button(
-        "Export to Excel",
-        data=excel_buffer,
-        file_name="providers.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="btn_export_excel",
-    )
+# Build provider list export data URL (CSV, same pattern as in-panel exports)
+_provider_export_rows = [[r["ID"], r["Game Provider"]] for _, r in df.iterrows()]
+_prov_csv_url, _prov_csv_filename = create_csv_data_url(
+    ["ID", "Game Provider"],
+    _provider_export_rows,
+    "providers"
+)
+
+st.markdown(f'''
+<div class="provider-list-header">
+    <div class="providers-title">Game Providers ({len(df)})</div>
+    <a href="{_prov_csv_url}" download="{_prov_csv_filename}" class="export-btn">Export to Excel</a>
+</div>
+''', unsafe_allow_html=True)
 
 # =================================================
 # Provider cards (CSS Grid - expands to full width when open)
