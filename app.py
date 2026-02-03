@@ -1181,6 +1181,29 @@ st.markdown(
         border-style: solid;
       }}
 
+      /* In-panel export button - match view-all-btn style */
+      div:has(> .view-all-btn) > .export-btn {{
+        background: var(--bg-hover) !important;
+        border: 1px dashed var(--border) !important;
+        border-radius: 20px !important;
+        padding: 0.5rem 1rem !important;
+        color: var(--text-secondary) !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        text-decoration: none !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }}
+      div:has(> .view-all-btn) > .export-btn:hover {{
+        background: var(--primary) !important;
+        color: white !important;
+        border-color: var(--primary) !important;
+        border-style: solid !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }}
+
       /* Hidden by search */
       .country-tag.hidden {{
         display: none !important;
@@ -4206,7 +4229,6 @@ else:
         if has_restricted and has_regulated:
             country_tab_id = f"country_{pid}"
             countries_html = (
-                f'<div class="panel-header"><span></span>{countries_export_btn}</div>'
                 f'<div class="country-type-tabs">'
                 f'<input type="radio" id="{country_tab_id}-restricted" name="{country_tab_id}" checked>'
                 f'<input type="radio" id="{country_tab_id}-regulated" name="{country_tab_id}">'
@@ -4219,9 +4241,9 @@ else:
                 f'</div>'
             )
         elif has_restricted:
-            countries_html = f'<div class="panel-header"><span></span>{countries_export_btn}</div>{restricted_html}'
+            countries_html = f'{restricted_html}'
         elif has_regulated:
-            countries_html = f'<div class="panel-header"><span></span>{countries_export_btn}</div>{regulated_html}'
+            countries_html = f'{regulated_html}'
         else:
             countries_html = '<p class="muted-text">No country restrictions</p>'
 
@@ -4304,8 +4326,13 @@ else:
   </div>
 </div>'''
 
-            # Add "View All" button to countries_html
-            countries_html += f'<button class="view-all-btn" data-modal="countries-modal-{pid}">View All ({total_countries} countries)</button>'
+            # Add "View All" + Export row to countries_html
+            countries_html += (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;">'
+                f'<button class="view-all-btn" data-modal="countries-modal-{pid}" style="margin-top:0;">View All ({total_countries} countries)</button>'
+                f'{countries_export_btn}'
+                f'</div>'
+            )
 
         # Supported Currencies - build fiat and crypto HTML
         fiat_html = ""
@@ -4520,16 +4547,20 @@ else:
 
         # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
         currencies_html = ""
-        # Build View All button (only if not ALL_FIAT mode and has currencies)
-        currencies_view_all_btn = ""
+        # Build View All + Export row (only if not ALL_FIAT mode and has currencies)
+        currencies_footer = ""
         if (has_fiat or has_crypto) and details["currency_mode"] != "ALL_FIAT":
-            currencies_view_all_btn = f'<button class="view-all-btn" data-modal="currencies-modal-{pid}">View All ({total_currencies} currencies)</button>'
+            currencies_footer = (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;">'
+                f'<button class="view-all-btn" data-modal="currencies-modal-{pid}" style="margin-top:0;">View All ({total_currencies} currencies)</button>'
+                f'{currencies_export_btn}'
+                f'</div>'
+            )
 
         if has_fiat and has_crypto:
             # Generate unique ID for this provider's currency tabs
             tab_id = f"curr_{pid}"
             currencies_html = (
-                f'<div class="panel-header"><span></span>{currencies_export_btn}</div>'
                 f'<div class="currency-tabs">'
                 f'<input type="radio" id="{tab_id}-fiat" name="{tab_id}" checked>'
                 f'<input type="radio" id="{tab_id}-crypto" name="{tab_id}">'
@@ -4540,12 +4571,12 @@ else:
                 f'<div class="fiat-panel">{fiat_html}</div>'
                 f'<div class="crypto-panel">{crypto_html}</div>'
                 f'</div>'
-                f'{currencies_view_all_btn}'
+                f'{currencies_footer}'
             )
         elif has_fiat:
-            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{fiat_html}{currencies_view_all_btn}'
+            currencies_html = f'{fiat_html}{currencies_footer}'
         elif has_crypto:
-            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{crypto_html}{currencies_view_all_btn}'
+            currencies_html = f'{crypto_html}{currencies_footer}'
 
         # Build top-level tabs wrapper (pure CSS radio pattern)
         main_tab_id = f"main_{pid}"
