@@ -289,7 +289,7 @@ st.markdown(
 
       /* Hide default header */
       header[data-testid="stHeader"] {{ display: none; }}
-      .block-container {{ padding-top: 4rem; padding-bottom: 2rem; margin-top: 0; }}
+      .block-container {{ padding-top: 3rem; padding-bottom: 2rem; margin-top: 0; }}
 
       /* Sticky header */
       .st-key-sticky_header {{
@@ -394,6 +394,38 @@ st.markdown(
       }}
       .filter-title svg {{
         color: {t["primary"]};
+      }}
+
+      /* More Filters toggle - full width text link */
+      .st-key-btn_toggle_filters {{
+        width: 100% !important;
+      }}
+      .st-key-btn_toggle_filters button {{
+        background: transparent !important;
+        border: none !important;
+        border-top: 1px solid {t["border"]} !important;
+        box-shadow: none !important;
+        color: {t["text_secondary"]} !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        padding: 0.5rem 0 !important;
+        min-height: unset !important;
+        width: 100% !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        border-radius: 0 !important;
+      }}
+      .st-key-btn_toggle_filters button:hover {{
+        color: {t["primary"]} !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-top: 1px solid {t["border"]} !important;
+        text-decoration: none !important;
+      }}
+      .st-key-btn_toggle_filters button:focus {{
+        outline: none !important;
+        box-shadow: none !important;
       }}
 
       /* Stats cards - Figma style with gradient backgrounds */
@@ -3616,7 +3648,7 @@ with st.container(key="sticky_header"):
                 st.rerun()
 
 # =================================================
-# Filters (match mock layout)
+# Filters (collapsible accordion)
 # =================================================
 
 # Defaults
@@ -3625,6 +3657,7 @@ st.session_state.setdefault("f_search", "")
 st.session_state.setdefault("f_country", "All Countries")
 st.session_state.setdefault("f_currency", "All Fiat Currencies")
 st.session_state.setdefault("f_crypto", "All Crypto Currencies")
+st.session_state.setdefault("filters_expanded", False)
 
 filter_mode = st.session_state["f_mode"]
 
@@ -3678,6 +3711,20 @@ if st.session_state["f_crypto"] not in crypto_options:
 if _needs_rerun:
     st.rerun()
 
+# Count active secondary filters (excluding search which is always visible)
+_secondary_filter_count = sum([
+    st.session_state["f_country"] != "All Countries",
+    st.session_state["f_currency"] != "All Fiat Currencies",
+    st.session_state["f_crypto"] != "All Crypto Currencies",
+    st.session_state["f_mode"] != "Supported"
+])
+
+# Inject CSS to hide secondary filters when collapsed
+if not st.session_state.get("filters_expanded", False):
+    st.markdown('''<style>
+      .st-key-secondary_filters { display: none !important; }
+    </style>''', unsafe_allow_html=True)
+
 with st.container(border=True):
     st.markdown(f'''
     <div class="filter-title">
@@ -3688,24 +3735,50 @@ with st.container(border=True):
     </div>
     ''', unsafe_allow_html=True)
 
-    left, right = st.columns([1, 1], gap="large")
+    # Search (always visible)
+    search = st.text_input(
+        "Search Provider:",
+        placeholder="Search by name...",
+        key="f_search",
+        label_visibility="visible",
+    )
 
-    with left:
-        search = st.text_input(
-            "Search Provider:",
-            placeholder="Search by name...",
-            key="f_search",
-            label_visibility="visible",
-        )
+    # Toggle button for secondary filters
+    _chevron = "▲" if st.session_state.get("filters_expanded", False) else "▼"
+    _count_label = f" ({_secondary_filter_count})" if _secondary_filter_count > 0 else ""
+    _toggle_label = f"{_chevron} More Filters{_count_label}"
 
+    def toggle_filters():
+        st.session_state["filters_expanded"] = not st.session_state.get("filters_expanded", False)
+
+    st.button(_toggle_label, key="btn_toggle_filters", on_click=toggle_filters)
+
+    # Secondary filters (hidden by default via CSS)
+    with st.container(key="secondary_filters"):
+        # Row 1: Country (full width)
         country_label = st.selectbox(
             "Country:",
             country_options,
             key="f_country",
         )
 
-        # Mode row (Supported button + Restricted text/button)
-        m1, m2 = st.columns([1, 1])
+        # Row 2: Fiat | Crypto
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            fiat_label = st.selectbox(
+                "Fiat Currency:",
+                fiat_options,
+                key="f_currency",
+            )
+        with fc2:
+            crypto_label = st.selectbox(
+                "Crypto Currency:",
+                crypto_options,
+                key="f_crypto",
+            )
+
+        # Row 3: Supported | Restricted
+        m1, m2 = st.columns(2)
         with m1:
             supported_style = "primary" if filter_mode == "Supported" else "secondary"
             if st.button("Supported", key="btn_supported", type=supported_style, use_container_width=True):
@@ -3717,20 +3790,7 @@ with st.container(border=True):
                 st.session_state["f_mode"] = "Restricted"
                 st.rerun()
 
-    with right:
-        fiat_label = st.selectbox(
-            "Fiat Currency:",
-            fiat_options,
-            key="f_currency",
-        )
-
-        crypto_label = st.selectbox(
-            "Crypto Currency:",
-            crypto_options,
-            key="f_crypto",
-        )
-
-    # Active filter badges + Clear all (same row)
+    # Active filter badges + Clear all (always visible)
     active_filters = []
 
     if search:
