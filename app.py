@@ -1277,6 +1277,50 @@ st.markdown(
         max-width: 1500px;
         max-height: 85vh;
       }}
+      .modal-content.modal-lg .modal-header {{
+        flex-wrap: wrap;
+        padding: 1.25rem 1.5rem;
+        gap: 0.5rem;
+      }}
+      .modal-header .provider-modal-icon {{
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-secondary) 100%);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }}
+      .modal-content.modal-lg .modal-header h3 {{
+        flex: 1;
+        margin: 0;
+      }}
+      .modal-content.modal-lg .modal-count {{
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }}
+      .modal-subtitle {{
+        width: 100%;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+        order: 10;
+      }}
+
+      /* Search input with magnifying glass icon */
+      .games-filter-bar .game-search {{
+        padding-left: 2.25rem !important;
+        background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: 0.75rem center;
+        background-size: 16px 16px;
+      }}
 
       /* Games filter bar */
       .games-filter-bar {{
@@ -1375,18 +1419,18 @@ st.markdown(
       .games-list {{
         padding: 1rem 1.5rem;
         overflow-y: auto;
-        max-height: calc(85vh - 200px);
+        max-height: calc(85vh - 220px);
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 1rem;
       }}
 
       /* Game card */
       .game-card {{
         display: flex;
-        gap: 1rem;
-        padding: 1rem;
-        background: var(--bg-card);
+        gap: 1.25rem;
+        padding: 1.25rem;
+        background: var(--bg-secondary);
         border: 1px solid var(--border);
         border-radius: 12px;
         transition: all 0.2s;
@@ -1399,12 +1443,12 @@ st.markdown(
         display: none !important;
       }}
 
-      /* Thumbnail - portrait ratio to match 440x590 images */
+      /* Thumbnail - larger portrait ratio */
       .game-thumbnail {{
-        width: 64px;
-        height: 86px;
-        border-radius: 8px;
-        background: var(--bg-secondary);
+        width: 90px;
+        height: 120px;
+        border-radius: 10px;
+        background: var(--bg-primary);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1423,7 +1467,47 @@ st.markdown(
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--bg-secondary);
+        background: var(--bg-primary);
+      }}
+
+      /* Clickable game thumbnail */
+      .game-thumbnail:has(img) {{
+        cursor: pointer;
+      }}
+      .game-thumbnail:has(img):hover {{
+        transform: scale(1.05);
+        transition: transform 0.2s ease;
+        box-shadow: 0 4px 12px var(--shadow);
+      }}
+
+      /* Thumbnail lightbox overlay */
+      .thumb-lightbox {{
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 20000;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        animation: fadeIn 0.2s ease;
+      }}
+      .thumb-lightbox.open {{
+        display: flex;
+      }}
+      .thumb-lightbox img {{
+        max-width: 90vw;
+        max-height: 90vh;
+        object-fit: contain;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }}
+      @keyframes fadeIn {{
+        from {{ opacity: 0; }}
+        to {{ opacity: 1; }}
       }}
 
       /* Game info */
@@ -1432,33 +1516,36 @@ st.markdown(
         min-width: 0;
       }}
       .game-title {{
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: 1.1rem;
+        font-weight: 700;
         color: var(--text-primary);
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.75rem;
       }}
 
-      /* Game meta row */
+      /* Game meta row - spread as columns */
       .game-meta {{
         display: flex;
-        gap: 1.5rem;
-        margin-bottom: 0.5rem;
+        gap: 2rem;
+        margin-bottom: 0.75rem;
         flex-wrap: wrap;
       }}
       .game-meta-item {{
         display: flex;
         flex-direction: column;
-        gap: 0.125rem;
+        gap: 0.25rem;
+        flex: 1;
+        min-width: 80px;
       }}
       .meta-label {{
         font-size: 0.7rem;
         color: var(--text-muted);
         text-transform: uppercase;
+        font-weight: 600;
       }}
       .meta-value {{
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: var(--text-primary);
-        font-weight: 500;
+        font-weight: 600;
       }}
 
       /* Volatility badges */
@@ -1466,11 +1553,13 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.2rem 0.5rem;
+        padding: 0.2rem 0.6rem;
         border-radius: 12px;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: 600;
         line-height: 1;
+        width: fit-content;
+        white-space: nowrap;
       }}
       .volatility-badge.low {{
         background: rgba(34, 197, 94, 0.2);
@@ -1493,20 +1582,28 @@ st.markdown(
         color: #EF4444;
       }}
 
-      /* Feature tags */
+      /* Feature tags - colored outlined pills */
       .game-features {{
         display: flex;
         flex-wrap: wrap;
-        gap: 0.375rem;
+        gap: 0.5rem;
       }}
       .feature-tag {{
-        padding: 0.25rem 0.5rem;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-size: 0.7rem;
-        color: var(--text-secondary);
+        padding: 0.3rem 0.65rem;
+        background: transparent;
+        border: 1px solid var(--primary);
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: var(--primary);
+        font-weight: 500;
       }}
+      /* Feature tag color variants */
+      .feature-tag.color-0 {{ border-color: #3B82F6; color: #3B82F6; background: transparent; }}
+      .feature-tag.color-1 {{ border-color: #10B981; color: #10B981; background: transparent; }}
+      .feature-tag.color-2 {{ border-color: #F43F5E; color: #F43F5E; background: transparent; }}
+      .feature-tag.color-3 {{ border-color: #F59E0B; color: #F59E0B; background: transparent; }}
+      .feature-tag.color-4 {{ border-color: #8B5CF6; color: #8B5CF6; background: transparent; }}
+      .feature-tag.color-5 {{ border-color: #06B6D4; color: #06B6D4; background: transparent; }}
 
       /* Game list empty state */
       .games-empty {{
@@ -1545,20 +1642,20 @@ st.markdown(
         /* Keep horizontal layout on mobile */
         .game-card {{
           flex-direction: row;
-          gap: 0.75rem;
-          padding: 0.75rem;
+          gap: 1rem;
+          padding: 1rem;
         }}
         /* Smaller thumbnail on mobile */
         .game-thumbnail {{
-          width: 50px;
-          height: 67px;
+          width: 70px;
+          height: 93px;
           flex-shrink: 0;
         }}
         .game-title {{
-          font-size: 0.9rem;
+          font-size: 0.95rem;
         }}
         .game-meta {{
-          gap: 0.5rem;
+          gap: 1rem;
         }}
         .game-meta-item {{
           min-width: 0;
@@ -1567,7 +1664,7 @@ st.markdown(
           font-size: 0.65rem;
         }}
         .meta-value {{
-          font-size: 0.75rem;
+          font-size: 0.8rem;
         }}
         .volatility-badge {{
           font-size: 0.65rem;
@@ -1577,12 +1674,20 @@ st.markdown(
         .game-features {{
           display: flex;
           flex-wrap: wrap;
-          gap: 0.25rem;
+          gap: 0.35rem;
           margin-top: 0.5rem;
         }}
         .feature-tag {{
           font-size: 0.65rem;
-          padding: 0.2rem 0.4rem;
+          padding: 0.2rem 0.5rem;
+        }}
+        /* Modal subtitle on mobile */
+        .modal-subtitle {{
+          font-size: 0.8rem;
+        }}
+        .modal-header .provider-modal-icon {{
+          width: 32px;
+          height: 32px;
         }}
         /* Collapsible filter on mobile */
         .games-filter-collapse {{
@@ -2702,11 +2807,12 @@ components.html(
           ? '<img src="' + thumbnail + '" alt="' + title + '" class="game-thumb-img"><div class="placeholder-icon" style="display:none;">' + placeholderSvg + '</div>'
           : '<div class="placeholder-icon">' + placeholderSvg + '</div>';
 
-        var featureTags = features.slice(0, 5).map(function(f) {
-          return '<span class="feature-tag">' + f + '</span>';
+        var featureColors = 6; // number of color classes
+        var featureTags = features.slice(0, 5).map(function(f, i) {
+          return '<span class="feature-tag color-' + (i % featureColors) + '">' + f + '</span>';
         }).join('');
         if (features.length > 5) {
-          featureTags += '<span class="feature-tag">+' + (features.length - 5) + ' more</span>';
+          featureTags += '<span class="feature-tag color-' + (5 % featureColors) + '">+' + (features.length - 5) + ' more</span>';
         }
 
         return '<div class="game-card" data-title="' + title.toLowerCase() + '" data-rtp="' + (rtp || 0) + '" data-volatility="' + volClass + '" data-theme="' + theme.toLowerCase() + '">' +
@@ -2859,6 +2965,45 @@ components.html(
         }
         } catch(err) {}
       }, true);
+
+      // Thumbnail lightbox - create overlay element once
+      var lightbox = doc.createElement('div');
+      lightbox.className = 'thumb-lightbox';
+      lightbox.innerHTML = '<img src="" alt="">';
+      doc.body.appendChild(lightbox);
+      var lightboxImg = lightbox.querySelector('img');
+
+      // Open lightbox on thumbnail click
+      addListener(doc, 'click', function(e) {
+        try {
+          var thumb = e.target.closest('.game-thumbnail');
+          if (!thumb) return;
+          var img = thumb.querySelector('img.game-thumb-img');
+          if (!img || img.style.display === 'none') return;
+          lightboxImg.src = img.src;
+          lightboxImg.alt = img.alt;
+          lightbox.classList.add('open');
+          e.stopPropagation();
+        } catch(err) { console.warn('Lightbox open error:', err); }
+      });
+
+      // Close lightbox on click
+      addListener(lightbox, 'click', function(e) {
+        try {
+          lightbox.classList.remove('open');
+          lightboxImg.src = '';
+        } catch(err) { console.warn('Lightbox close error:', err); }
+      });
+
+      // Close lightbox on ESC
+      addListener(doc, 'keydown', function(e) {
+        try {
+          if (e.key === 'Escape' && lightbox.classList.contains('open')) {
+            lightbox.classList.remove('open');
+            lightboxImg.src = '';
+          }
+        } catch(err) {}
+      });
 
       } catch(e) { console.warn('TT init error:', e); }
     })();
@@ -4487,10 +4632,11 @@ else:
         games_modal_html = f'''<div class="modal-overlay" id="games-modal-{pid}" data-provider-id="{pid}" data-provider-name="{pname}">
   <div class="modal-content modal-lg">
     <div class="modal-header">
-      <h3>Game List - {pname}</h3>
+      <div class="provider-modal-icon">{svg_icon("gamepad", "var(--primary)", 22)}</div>
+      <h3>{pname}</h3>
       <span class="modal-count">{game_count} games</span>
-      {games_export_btn}
       <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
+      <div class="modal-subtitle">Browse and filter games from {pname} to find the perfect match for your needs.</div>
     </div>
     <details class="games-filter-collapse" open>
       <summary>
