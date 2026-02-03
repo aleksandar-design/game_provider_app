@@ -1936,7 +1936,8 @@ st.markdown(
         border-color: {t["primary"]};
       }}
       .provider-card .card-header {{
-        padding: 1rem;
+        position: relative;
+        padding: 1.25rem;
         cursor: pointer;
         list-style: none;
         display: block;
@@ -1962,35 +1963,43 @@ st.markdown(
       /* Card header layout classes */
       .card-header-top {{
         display: flex;
-        justify-content: space-between;
+        gap: 1rem;
         align-items: flex-start;
-        margin-bottom: 0.5rem;
-      }}
-      .card-header-left {{
-        display: flex;
-        gap: 0.75rem;
-        align-items: center;
       }}
       .provider-icon {{
-        width: 48px;
-        height: 48px;
+        width: 100px;
+        height: 100px;
+        min-width: 100px;
         background: linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-secondary) 100%);
-        border-radius: 12px;
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
+      }}
+      .provider-info {{
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
       }}
       .provider-name {{
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: 1.1rem;
+        font-weight: 700;
         color: var(--text-primary);
       }}
       .provider-games {{
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         color: var(--text-secondary);
       }}
+      .card-header-top .expand-icon {{
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+      }}
       .card-games-section {{
-        margin-top: 0.75rem;
+        margin-top: 0.5rem;
       }}
       .games-label {{
         font-size: 0.75rem;
@@ -2416,6 +2425,21 @@ st.markdown(
           align-items: center !important;
           gap: 0.75rem !important;
           text-align: center !important;
+        }}
+
+        /* Provider card header - smaller icon on mobile */
+        .provider-icon {{
+          width: 72px !important;
+          height: 72px !important;
+          min-width: 72px !important;
+          border-radius: 12px !important;
+        }}
+        .provider-icon svg {{
+          width: 28px !important;
+          height: 28px !important;
+        }}
+        .provider-name {{
+          font-size: 1rem !important;
         }}
 
         /* Constrain expanded card content on mobile */
@@ -4735,7 +4759,7 @@ else:
         )
 
         # Build card HTML
-        card_html = f'''<details class="provider-card"><summary class="card-header"><div class="card-header-top"><div class="card-header-left"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 24)}</div><div><div class="provider-name">{pname}</div><div class="provider-games">{stats['games']} games</div></div></div><span class="expand-icon">▼</span></div><div class="card-games-section"><div class="games-label">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
+        card_html = f'''<details class="provider-card"><summary class="card-header"><div class="card-header-top"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 40)}</div><div class="provider-info"><div class="provider-name">{pname}</div><div class="provider-games">{stats['games']} games available</div><div class="card-games-section"><div class="games-label">Supported Games:</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></div><span class="expand-icon">▼</span></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
         # Append modal HTML if exists (modal must be outside the card)
         if countries_modal_html:
             card_html += countries_modal_html
