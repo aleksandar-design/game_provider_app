@@ -447,12 +447,11 @@ st.markdown(
         width: 100px !important;
         min-width: 100px !important;
         max-width: 100px !important;
+        transition: all 0.2s ease !important;
       }}
       .st-key-btn_apply_filters button:hover {{
-        opacity: 0.9 !important;
-        box-shadow: 0 2px 8px {t["primary"]}40 !important;
-        background: {t["primary"]} !important;
-        border: none !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px {t["primary"]}40 !important;
       }}
 
       /* APPLY button column - always push to far right */
@@ -823,7 +822,7 @@ st.markdown(
         text-align: center;
         padding: 0.5rem 1rem;
         border-radius: 0.5rem;
-        background: {t["bg_card"]};
+        background: {t["bg_secondary"]};
         border: 1px solid {t["border"]};
         color: {t["text_secondary"]};
         font-size: 0.875rem;
@@ -834,13 +833,16 @@ st.markdown(
         align-items: center;
         justify-content: center;
         gap: 0.375rem;
+        box-shadow: 0 1px 2px {t["shadow"]};
       }}
       .provider-main-tabs .main-tab svg {{
         flex-shrink: 0;
       }}
       .provider-main-tabs .main-tab:hover {{
         background: {t["bg_hover"]};
-        border-color: rgba(59, 130, 246, 0.5);
+        border-color: {t["primary"]};
+        color: {t["text_primary"]};
+        box-shadow: 0 2px 6px {t["shadow"]};
       }}
       .provider-main-tabs .main-panel {{
         display: none;
@@ -989,8 +991,8 @@ st.markdown(
         transition: all 0.2s ease;
       }}
       .export-btn:hover {{
-        background: #2563EB;
-        border-color: #2563EB;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px #3B82F640;
       }}
       .export-btn::before {{
         content: "↓";
@@ -1971,11 +1973,11 @@ st.markdown(
         background: {t["primary"]} !important;
         color: {t["primary_foreground"]} !important;
         border: none !important;
+        transition: all 0.2s ease !important;
       }}
       .stDownloadButton > button:hover {{
-        background: {t["primary"]}dd !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px {t["primary"]}40;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px {t["primary"]}40 !important;
       }}
 
       /* Clear all button overrides (beat generic button styling) */
