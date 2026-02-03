@@ -289,7 +289,9 @@ st.markdown(
 
       /* Hide default header */
       header[data-testid="stHeader"] {{ display: none; }}
-      .block-container {{ padding-top: 3rem; padding-bottom: 2rem; margin-top: 0; }}
+      .block-container {{ padding-top: 3.5rem; padding-bottom: 2rem; margin-top: -0.5rem; }}
+      .block-container > [data-testid="stVerticalBlock"] {{ gap: 0.5rem !important; }}
+      .block-container > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"]:first-child {{ padding-top: 0 !important; margin-top: 0 !important; }}
 
       /* Sticky header */
       .st-key-sticky_header {{
@@ -426,6 +428,48 @@ st.markdown(
       .st-key-btn_toggle_filters button:focus {{
         outline: none !important;
         box-shadow: none !important;
+      }}
+
+      /* Apply Filters button */
+      .st-key-btn_apply_filters {{
+        width: 100px !important;
+      }}
+      .st-key-btn_apply_filters button {{
+        background: {t["primary"]} !important;
+        color: {t["primary_foreground"]} !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 0.8rem !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        padding: 0.4rem 1rem !important;
+        width: 100px !important;
+        min-width: 100px !important;
+        max-width: 100px !important;
+      }}
+      .st-key-btn_apply_filters button:hover {{
+        opacity: 0.9 !important;
+        box-shadow: 0 2px 8px {t["primary"]}40 !important;
+        background: {t["primary"]} !important;
+        border: none !important;
+      }}
+
+      /* APPLY button column - always push to far right */
+      div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) {{
+        align-items: center !important;
+      }}
+      div[data-testid="stHorizontalBlock"]:has(.st-key-btn_apply_filters) > div:last-child {{
+        margin-left: auto !important;
+        flex: 0 0 100px !important;
+        width: 100px !important;
+        min-width: 100px !important;
+        max-width: 100px !important;
+      }}
+
+      /* Hide "Press Enter to apply" hint on text inputs */
+      [data-testid="InputInstructions"] {{
+        display: none !important;
       }}
 
       /* Stats cards - Figma style with gradient backgrounds */
@@ -2186,6 +2230,12 @@ st.markdown(
           padding: 0.5rem !important;
         }}
 
+        /* Fix header-to-content spacing for taller mobile header */
+        .block-container {{
+          padding-top: 7rem !important;
+          margin-top: -1rem !important;
+        }}
+
         /* Stack main header columns into rows */
         .st-key-sticky_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
           flex-wrap: wrap !important;
@@ -3719,12 +3769,6 @@ _secondary_filter_count = sum([
     st.session_state["f_mode"] != "Supported"
 ])
 
-# Inject CSS to hide secondary filters when collapsed
-if not st.session_state.get("filters_expanded", False):
-    st.markdown('''<style>
-      .st-key-secondary_filters { display: none !important; }
-    </style>''', unsafe_allow_html=True)
-
 with st.container(border=True):
     st.markdown(f'''
     <div class="filter-title">
@@ -3753,8 +3797,8 @@ with st.container(border=True):
 
     st.button(_toggle_label, key="btn_toggle_filters", on_click=toggle_filters)
 
-    # Secondary filters (hidden by default via CSS)
-    with st.container(key="secondary_filters"):
+    # Secondary filters - only render when expanded (prevents flicker)
+    if st.session_state.get("filters_expanded", False):
         # Row 1: Country (full width)
         country_label = st.selectbox(
             "Country:",
@@ -3780,15 +3824,20 @@ with st.container(border=True):
         # Row 3: Supported | Restricted
         m1, m2 = st.columns(2)
         with m1:
-            supported_style = "primary" if filter_mode == "Supported" else "secondary"
-            if st.button("Supported", key="btn_supported", type=supported_style, use_container_width=True):
+            def set_supported():
                 st.session_state["f_mode"] = "Supported"
-                st.rerun()
+            supported_style = "primary" if filter_mode == "Supported" else "secondary"
+            st.button("Supported", key="btn_supported", type=supported_style, use_container_width=True, on_click=set_supported)
         with m2:
-            restricted_style = "primary" if filter_mode == "Restricted" else "secondary"
-            if st.button("Restricted", key="btn_restricted", type=restricted_style, use_container_width=True):
+            def set_restricted():
                 st.session_state["f_mode"] = "Restricted"
-                st.rerun()
+            restricted_style = "primary" if filter_mode == "Restricted" else "secondary"
+            st.button("Restricted", key="btn_restricted", type=restricted_style, use_container_width=True, on_click=set_restricted)
+    else:
+        # When collapsed, read from session state directly (no widgets rendered = no flicker)
+        country_label = st.session_state.get("f_country", "All Countries")
+        fiat_label = st.session_state.get("f_currency", "All Fiat Currencies")
+        crypto_label = st.session_state.get("f_crypto", "All Crypto Currencies")
 
     # Active filter badges + Clear all (always visible)
     active_filters = []
@@ -3834,11 +3883,15 @@ with st.container(border=True):
             )
         badges_html += "</div>"
 
-        af1, af2 = st.columns([8, 1], gap="small")
+    # Active filters row: badges + clear all + APPLY (always rendered)
+    af1, af2, af3 = st.columns([7, 0.8, 1.2], gap="small")
+    if active_filters:
         with af1:
             st.markdown(badges_html, unsafe_allow_html=True)
         with af2:
             st.button("Clear all", key="btn_clear_all", type="secondary", on_click=clear_all_filters)
+    with af3:
+        st.button("Apply", key="btn_apply_filters", type="primary", use_container_width=True)
 
 # =================================================
 # Query building
