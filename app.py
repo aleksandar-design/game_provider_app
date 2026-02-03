@@ -956,8 +956,8 @@ st.markdown(
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: 16px;
-        width: 90%;
-        max-width: 600px;
+        width: 95%;
+        max-width: 1700px;
         max-height: 80vh;
         overflow: hidden;
         display: flex;
@@ -1174,7 +1174,6 @@ st.markdown(
       /* Game List Modal - larger size */
       .modal-content.modal-lg {{
         max-width: 1700px;
-        width: 95%;
         max-height: 85vh;
       }}
 
@@ -1427,11 +1426,14 @@ st.markdown(
         font-size: 0.9rem;
       }}
 
-      /* Mobile responsive for games modal */
+      /* Mobile responsive for modals */
       @media (max-width: 640px) {{
+        .modal-content,
         .modal-content.modal-lg {{
           max-width: 100%;
+          width: calc(100% - 1rem);
           margin: 0.5rem;
+          max-height: 90vh;
         }}
         .filter-row {{
           flex-direction: column;
