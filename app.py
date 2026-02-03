@@ -4029,7 +4029,7 @@ st.markdown(f"""
 # =================================================
 # Provider list header with export
 # =================================================
-pcol1, pcol2, pcol3 = st.columns([1, 1.15, 0.22])
+pcol1, pcol2, pcol3 = st.columns([7, 0.8, 1.2], gap="small")
 with pcol1:
     st.markdown(f'<div class="providers-title">Game Providers ({len(df)})</div>', unsafe_allow_html=True)
 # pcol2 empty
@@ -4044,6 +4044,7 @@ with pcol3:
         file_name="providers.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="btn_export_excel",
+        use_container_width=True,
     )
 
 # =================================================
@@ -4323,8 +4324,6 @@ else:
                 for curr in fiat_list[:9]:
                     symbol = get_currency_symbol(curr)
                     fiat_html += f'<div class="currency-btn fiat"><span class="symbol">{symbol}</span>{curr}</div>'
-                if len(fiat_list) > 9:
-                    fiat_html += f'<div class="currency-btn fiat more-toggle" data-modal="currencies-modal-{pid}">+{len(fiat_list) - 9} more</div>'
                 fiat_html += '</div>'
 
         # Build crypto HTML
@@ -4336,8 +4335,6 @@ else:
             for curr in crypto_list[:9]:
                 symbol = get_currency_symbol(curr)
                 crypto_html += f'<div class="currency-btn crypto"><span class="symbol">{symbol}</span>{curr}</div>'
-            if len(crypto_list) > 9:
-                crypto_html += f'<div class="currency-btn crypto more-toggle" data-modal="currencies-modal-{pid}">+{len(crypto_list) - 9} more</div>'
             crypto_html += '</div>'
 
         # Generate currencies export CSV data (used for both modal and panel)
@@ -4359,9 +4356,9 @@ else:
                 )
                 currencies_export_btn = f'<a href="{csv_url}" download="{csv_filename}" class="export-btn">Export to Excel</a>'
 
-        # Build currencies modal if there are more than 9 of either type
-        if (len(fiat_list) > 9 or len(crypto_list) > 9) and details["currency_mode"] != "ALL_FIAT":
-            total_currencies = len(fiat_list) + len(crypto_list)
+        # Build currencies modal (always, when there are currencies)
+        total_currencies = len(fiat_list) + len(crypto_list)
+        if (has_fiat or has_crypto) and details["currency_mode"] != "ALL_FIAT":
 
             # Build fiat section for modal (ALL currencies)
             modal_fiat_html = '<div class="currency-grid modal-currency-grid">'
@@ -4523,6 +4520,11 @@ else:
 
         # Build currencies section HTML (with fiat/crypto sub-tabs if needed)
         currencies_html = ""
+        # Build View All button (only if not ALL_FIAT mode and has currencies)
+        currencies_view_all_btn = ""
+        if (has_fiat or has_crypto) and details["currency_mode"] != "ALL_FIAT":
+            currencies_view_all_btn = f'<button class="view-all-btn" data-modal="currencies-modal-{pid}">View All ({total_currencies} currencies)</button>'
+
         if has_fiat and has_crypto:
             # Generate unique ID for this provider's currency tabs
             tab_id = f"curr_{pid}"
@@ -4538,11 +4540,12 @@ else:
                 f'<div class="fiat-panel">{fiat_html}</div>'
                 f'<div class="crypto-panel">{crypto_html}</div>'
                 f'</div>'
+                f'{currencies_view_all_btn}'
             )
         elif has_fiat:
-            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{fiat_html}'
+            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{fiat_html}{currencies_view_all_btn}'
         elif has_crypto:
-            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{crypto_html}'
+            currencies_html = f'<div class="panel-header"><span></span>{currencies_export_btn}</div>{crypto_html}{currencies_view_all_btn}'
 
         # Build top-level tabs wrapper (pure CSS radio pattern)
         main_tab_id = f"main_{pid}"
