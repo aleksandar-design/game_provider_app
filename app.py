@@ -2573,6 +2573,7 @@ components.html(
               if (radio) radio.checked = true;
             }
           }
+          e.preventDefault();
           e.stopPropagation();
           return;
         }
@@ -2587,6 +2588,7 @@ components.html(
               if (radio) radio.checked = true;
             }
           }
+          e.preventDefault();
           e.stopPropagation();
           return;
         }
@@ -2624,6 +2626,7 @@ components.html(
               }
             }
           }
+          e.preventDefault();
           e.stopPropagation();
           return;
         }
@@ -2846,7 +2849,8 @@ components.html(
       function buildGameCard(game) {
         var title = game.title || '';
         var rtp = game.rtp;
-        var rtpDisplay = rtp ? rtp.toFixed(2) : 'N/A';
+        var rtpNum = Number(rtp);
+        var rtpDisplay = (rtp !== null && rtp !== undefined && rtp !== '' && !isNaN(rtpNum)) ? rtpNum.toFixed(2) : 'N/A';
         var volatility = getVolatilityLabel(game.volatility);
         var volClass = normalizeVolatilityClass(game.volatility);
         var themes = parseJsonField(game.themes);
@@ -3159,7 +3163,7 @@ def load_provider_card_data(provider_ids_tuple):
 
     # Restrictions
     restrictions_df = qdf(
-        f"SELECT provider_id, country_code, restriction_type FROM restrictions WHERE provider_id IN ({placeholders})",
+        f"SELECT provider_id, country_code, restriction_type FROM restrictions WHERE provider_id IN ({placeholders}) ORDER BY provider_id, restriction_type, country_code",
         tuple(provider_ids),
     )
     restricted = {}
@@ -3179,11 +3183,11 @@ def load_provider_card_data(provider_ids_tuple):
     currency_count = {}
     try:
         fiat_df = qdf(
-            f"SELECT provider_id, currency_code FROM fiat_currencies WHERE provider_id IN ({placeholders})",
+            f"SELECT provider_id, currency_code FROM fiat_currencies WHERE provider_id IN ({placeholders}) ORDER BY provider_id, currency_code",
             tuple(provider_ids),
         )
         crypto_df = qdf(
-            f"SELECT provider_id, currency_code FROM crypto_currencies WHERE provider_id IN ({placeholders})",
+            f"SELECT provider_id, currency_code FROM crypto_currencies WHERE provider_id IN ({placeholders}) ORDER BY provider_id, currency_code",
             tuple(provider_ids),
         )
         for row in fiat_df.itertuples(index=False):
@@ -4689,6 +4693,7 @@ else:
       <div class="provider-modal-icon">{svg_icon("gamepad", "var(--primary)", 22)}</div>
       <h3>{pname}</h3>
       <span class="modal-count">{game_count} games</span>
+      {games_export_btn}
       <button class="modal-close" data-close-modal="games-modal-{pid}">&times;</button>
       <div class="modal-subtitle">Browse and filter games from {pname} to find the perfect match for your needs.</div>
     </div>
