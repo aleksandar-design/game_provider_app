@@ -1937,10 +1937,11 @@ st.markdown(
       }}
       .provider-card .card-header {{
         position: relative;
-        padding: 1.25rem;
+        padding: 0;
         cursor: pointer;
         list-style: none;
-        display: block;
+        display: flex;
+        gap: 0;
       }}
       .provider-card .card-header::-webkit-details-marker {{
         display: none;
@@ -1961,42 +1962,55 @@ st.markdown(
       }}
 
       /* Card header layout classes */
-      .card-header-top {{
-        display: flex;
-        gap: 1rem;
-        align-items: flex-start;
-      }}
       .provider-icon {{
-        width: 100px;
-        height: 100px;
-        min-width: 100px;
+        width: 110px;
+        min-width: 110px;
+        min-height: 100%;
         background: linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-secondary) 100%);
-        border-radius: 16px;
+        border-radius: 11px 0 0 11px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+      }}
+      .provider-card[open] .provider-icon {{
+        border-radius: 11px 0 0 0;
+      }}
+      .provider-info-wrapper {{
+        flex: 1;
+        padding: 1.25rem;
+        min-width: 0;
+      }}
+      .card-header-top {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
       }}
       .provider-info {{
         flex: 1;
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.5rem;
       }}
       .provider-name {{
         font-size: 1.1rem;
         font-weight: 700;
         color: var(--text-primary);
       }}
-      .provider-games {{
-        font-size: 0.85rem;
+      .provider-games-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.8rem;
         color: var(--text-secondary);
-      }}
-      .card-header-top .expand-icon {{
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
+        font-weight: 500;
+        width: fit-content;
       }}
       .card-games-section {{
         margin-top: 0.5rem;
@@ -2427,12 +2441,14 @@ st.markdown(
           text-align: center !important;
         }}
 
-        /* Provider card header - smaller icon on mobile */
+        /* Provider card header - narrower icon panel on mobile */
         .provider-icon {{
           width: 72px !important;
-          height: 72px !important;
           min-width: 72px !important;
-          border-radius: 12px !important;
+          border-radius: 11px 0 0 11px !important;
+        }}
+        .provider-card[open] .provider-icon {{
+          border-radius: 11px 0 0 0 !important;
         }}
         .provider-icon svg {{
           width: 28px !important;
@@ -4759,7 +4775,7 @@ else:
         )
 
         # Build card HTML
-        card_html = f'''<details class="provider-card"><summary class="card-header"><div class="card-header-top"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 40)}</div><div class="provider-info"><div class="provider-name">{pname}</div><div class="provider-games">{stats['games']} games available</div><div class="card-games-section"><div class="games-label">Supported Games:</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></div><span class="expand-icon">▼</span></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
+        card_html = f'''<details class="provider-card"><summary class="card-header"><div class="provider-icon">{svg_icon("gamepad", "var(--primary)", 36)}</div><div class="provider-info-wrapper"><div class="card-header-top"><div class="provider-info"><div class="provider-name">{pname}</div><span class="provider-games-badge">{svg_icon("gamepad", "var(--text-secondary)", 14)} {stats['games']} games</span></div><span class="expand-icon">▼</span></div><div class="card-games-section"><div class="games-label">Supported Games</div><div class="games-container">{''.join([f'<span class="game-chip">{g}</span>' for g in (supported_games or ['No data'])])}</div></div></div></summary><div class="card-details-content">{details_html if details_html else '<p class="muted-text">No details available</p>'}</div></details>'''
         # Append modal HTML if exists (modal must be outside the card)
         if countries_modal_html:
             card_html += countries_modal_html
