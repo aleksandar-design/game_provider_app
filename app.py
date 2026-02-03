@@ -2184,6 +2184,17 @@ st.markdown(
           content: none !important;
         }}
 
+        /* Export button - compact on mobile */
+        .st-key-btn_export_excel button {{
+          font-size: 0 !important;
+          padding: 0.4rem 0.6rem !important;
+          min-width: auto !important;
+        }}
+        .st-key-btn_export_excel button::after {{
+          content: "📥" !important;
+          font-size: 1rem !important;
+        }}
+
         /* Constrain expanded card content on mobile */
         .provider-card {{
           max-width: 100% !important;
@@ -2228,12 +2239,40 @@ components.html(
     """
     <script>
     (function () {
+      try {
       // Attach to the Streamlit page (parent), not the iframe
       const doc = window.parent.document;
+
+      // Remove old listeners before re-attaching (prevents duplicates AND stale refs)
+      if (doc.__ttCleanup) {
+        try { doc.__ttCleanup(); } catch(e) {}
+      }
+
+      // Reset init flag on each run so listeners re-attach after rerun
+      doc.__ttStopPropInit = false;
+
       if (doc.__ttStopPropInit) return;
       doc.__ttStopPropInit = true;
 
+      // Store all listeners for cleanup
+      var listeners = [];
+      function addListener(target, event, handler, capture) {
+        try {
+          target.addEventListener(event, handler, capture || false);
+          listeners.push({ target: target, event: event, handler: handler, capture: capture || false });
+        } catch(e) { console.warn('addListener error:', e); }
+      }
+
+      doc.__ttCleanup = function() {
+        listeners.forEach(function(l) {
+          try { l.target.removeEventListener(l.event, l.handler, l.capture); } catch(e) {}
+        });
+        listeners = [];
+        doc.__ttStopPropInit = false;
+      };
+
       function stopIfTabClick(e) {
+        try {
         // Currency sub-tabs - explicitly check radio since stopPropagation prevents default
         const currencySubtab = e.target.closest('.currency-tabs label.subtab');
         if (currencySubtab) {
@@ -2298,14 +2337,16 @@ components.html(
           e.stopPropagation();
           return;
         }
+        } catch(err) { console.warn('stopIfTabClick error:', err); }
       }
 
       // Use capture phase so we intercept before <summary> handles it
-      doc.addEventListener('pointerdown', stopIfTabClick, true);
-      doc.addEventListener('click', stopIfTabClick, true);
+      addListener(doc, 'pointerdown', stopIfTabClick, true);
+      addListener(doc, 'click', stopIfTabClick, true);
 
       // Accordion: close other cards when one opens
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         const summary = e.target.closest('details.provider-card > summary');
         if (summary) {
           const card = summary.parentElement;
@@ -2316,10 +2357,12 @@ components.html(
             });
           }
         }
+        } catch(err) { console.warn('Accordion error:', err); }
       }, true);
 
       // Modal open (View All button)
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         const openBtn = e.target.closest('[data-modal]');
         if (openBtn) {
           const modalId = openBtn.getAttribute('data-modal');
@@ -2335,19 +2378,23 @@ components.html(
           e.stopPropagation();
           e.preventDefault();
         }
+        } catch(err) { console.warn('Modal open error:', err); }
       });
 
       // Helper: switch back to currencies tab when closing games modal
       function switchToCurrenciesTab(modalId) {
+        try {
         if (modalId && modalId.startsWith('games-modal-')) {
           const pid = modalId.replace('games-modal-', '');
           const currenciesRadio = doc.getElementById('main_' + pid + '-currencies');
           if (currenciesRadio) currenciesRadio.checked = true;
         }
+        } catch(err) {}
       }
 
       // Modal close (X button)
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         const closeBtn = e.target.closest('[data-close-modal]');
         if (closeBtn) {
           const modalId = closeBtn.getAttribute('data-close-modal');
@@ -2358,28 +2405,34 @@ components.html(
           }
           e.stopPropagation();
         }
+        } catch(err) { console.warn('Modal close error:', err); }
       });
 
       // Modal close (backdrop click)
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         if (e.target.classList.contains('modal-overlay')) {
           e.target.classList.remove('open');
           switchToCurrenciesTab(e.target.id);
         }
+        } catch(err) { console.warn('Backdrop click error:', err); }
       });
 
       // Modal close (ESC key)
-      doc.addEventListener('keydown', function(e) {
+      addListener(doc, 'keydown', function(e) {
+        try {
         if (e.key === 'Escape') {
           doc.querySelectorAll('.modal-overlay.open').forEach(function(m) {
             m.classList.remove('open');
             switchToCurrenciesTab(m.id);
           });
         }
+        } catch(err) { console.warn('ESC key error:', err); }
       });
 
       // Modal tab click handler
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         const modalSubtab = e.target.closest('.modal-tabs label.subtab');
         if (modalSubtab) {
           const radioId = modalSubtab.getAttribute('for');
@@ -2389,10 +2442,12 @@ components.html(
           }
           e.stopPropagation();
         }
+        } catch(err) { console.warn('Modal tab error:', err); }
       }, true);
 
       // Country search filter
-      doc.addEventListener('input', function(e) {
+      addListener(doc, 'input', function(e) {
+        try {
         if (e.target.classList.contains('country-search')) {
           const query = e.target.value.toLowerCase();
           const modalId = e.target.getAttribute('data-target');
@@ -2404,10 +2459,12 @@ components.html(
             });
           }
         }
+        } catch(err) { console.warn('Country search error:', err); }
       });
 
       // Currency search filter
-      doc.addEventListener('input', function(e) {
+      addListener(doc, 'input', function(e) {
+        try {
         if (e.target.classList.contains('currency-search-input')) {
           const query = e.target.value.toLowerCase();
           const modalId = e.target.getAttribute('data-modal-id');
@@ -2422,10 +2479,12 @@ components.html(
             });
           }
         }
+        } catch(err) { console.warn('Currency search error:', err); }
       });
 
       // Currency modal tab click handler
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         const currencySubtab = e.target.closest('.currency-modal-tabs label.subtab');
         if (currencySubtab) {
           const radioId = currencySubtab.getAttribute('for');
@@ -2435,6 +2494,7 @@ components.html(
           }
           e.stopPropagation();
         }
+        } catch(err) { console.warn('Currency modal tab error:', err); }
       }, true);
 
       // Placeholder SVG for missing thumbnails
@@ -2620,35 +2680,42 @@ components.html(
       }
 
       // Game search filter
-      doc.addEventListener('input', function(e) {
+      addListener(doc, 'input', function(e) {
+        try {
         if (e.target.classList.contains('game-search')) {
           const modalId = e.target.getAttribute('data-modal');
           filterGames(modalId);
         }
+        } catch(err) { console.warn('Game search error:', err); }
       });
 
       // Game dropdown filters
-      doc.addEventListener('change', function(e) {
+      addListener(doc, 'change', function(e) {
+        try {
         if (e.target.classList.contains('game-filter-rtp') ||
             e.target.classList.contains('game-filter-volatility') ||
             e.target.classList.contains('game-filter-theme')) {
           const modalId = e.target.getAttribute('data-modal');
           filterGames(modalId);
         }
+        } catch(err) { console.warn('Game filter error:', err); }
       });
 
       // Apply filter button (mobile) - closes filter panel
-      doc.addEventListener('click', function(e) {
+      addListener(doc, 'click', function(e) {
+        try {
         if (e.target.classList.contains('filter-apply-btn')) {
           const modalId = e.target.getAttribute('data-modal');
           filterGames(modalId);
           const details = e.target.closest('details.games-filter-collapse');
           if (details) details.removeAttribute('open');
         }
+        } catch(err) { console.warn('Filter apply error:', err); }
       });
 
       // Handle broken images - show placeholder (capture phase for img errors)
-      doc.addEventListener('error', function(e) {
+      addListener(doc, 'error', function(e) {
+        try {
         if (e.target.classList && e.target.classList.contains('game-thumb-img')) {
           e.target.style.display = 'none';
           const placeholder = e.target.nextElementSibling;
@@ -2656,7 +2723,10 @@ components.html(
             placeholder.style.display = 'flex';
           }
         }
+        } catch(err) {}
       }, true);
+
+      } catch(e) { console.warn('TT init error:', e); }
     })();
     </script>
     """.replace("__GAMES_JSON_PLACEHOLDER__", _games_json_data),
