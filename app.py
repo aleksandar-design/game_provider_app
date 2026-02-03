@@ -418,14 +418,14 @@ st.markdown(
         border-radius: 0 !important;
       }}
       .st-key-btn_toggle_filters button:hover {{
-        color: {t["primary"]} !important;
-        background: transparent !important;
+        color: {t["text_primary"]} !important;
+        background: {t["bg_hover"]} !important;
         box-shadow: none !important;
-        border: none !important;
-        border-top: 1px solid {t["border"]} !important;
+        border: 1px solid {t["border"]} !important;
         text-decoration: none !important;
       }}
-      .st-key-btn_toggle_filters button:focus {{
+      .st-key-btn_toggle_filters button:focus,
+      .st-key-btn_toggle_filters button:active {{
         outline: none !important;
         box-shadow: none !important;
       }}
